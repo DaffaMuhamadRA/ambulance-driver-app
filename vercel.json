@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next",
+      "config": {
+        "includeFiles": [
+          "next.config.mjs",
+          "public/**/*",
+          ".env"
+        ]
+      }
+    }
+  ],
+  "env": {
+    "PGHOST": "ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech",
+    "PGDATABASE": "neondb",
+    "PGUSER": "neondb_owner",
+    "PGPASSWORD": "npg_26wQetjypolP",
+    "PGSSLMODE": "require",
+    "PGCHANNELBINDING": "require"
+  }
+}

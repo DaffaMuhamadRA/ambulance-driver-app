@@ -41,8 +41,12 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Login error:", error);
+    // Return more specific error messages for debugging
+    if (error.message && error.message.includes("database")) {
+      return NextResponse.json({ error: "Koneksi database gagal. Silakan coba lagi nanti." }, { status: 500 });
+    }
     return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });
   }
 }

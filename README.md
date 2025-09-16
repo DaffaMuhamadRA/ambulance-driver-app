@@ -117,6 +117,54 @@ Database Neon sudah berisi data pengguna yang dapat digunakan:
 
 **Catatan**: Database Neon mungkin berisi lebih banyak pengguna dengan berbagai email dan kredensial. Gunakan kredensial yang sesuai dengan data yang ada di database.
 
+## Deployment ke Vercel
+
+### Persyaratan
+- Akun Vercel (https://vercel.com)
+- Project ini sudah dikonfigurasi untuk deployment ke Vercel
+
+### Langkah-langkah Deployment
+
+1. **Import Project ke Vercel**:
+   - Masuk ke dashboard Vercel
+   - Klik "New Project"
+   - Pilih repository yang berisi project ini
+   - Klik "Import"
+
+2. **Konfigurasi Environment Variables**:
+   Setelah import, tambahkan environment variables berikut di Vercel dashboard:
+   ```
+   PGHOST=ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech
+   PGDATABASE=neondb
+   PGUSER=neondb_owner
+   PGPASSWORD=npg_26wQetjypolP
+   PGSSLMODE=require
+   PGCHANNELBINDING=require
+   ```
+
+3. **Deploy**:
+   - Klik "Deploy" untuk memulai deployment pertama
+   - Vercel akan secara otomatis mendeteksi Next.js dan membangun project
+
+4. **Verifikasi Deployment**:
+   - Setelah deployment selesai, buka URL yang diberikan oleh Vercel
+   - Coba akses halaman login dan lakukan login dengan kredensial yang tersedia
+
+### Troubleshooting Deployment
+
+Jika mengalami masalah saat deployment:
+
+1. **Error 500 pada API routes**:
+   - Pastikan environment variables sudah diatur dengan benar di Vercel
+   - Periksa logs di Vercel dashboard untuk detail error
+
+2. **Database Connection Issues**:
+   - Verifikasi bahwa kredensial database benar
+   - Pastikan database Neon dapat diakses dari Vercel (firewall settings)
+
+3. **Environment Variables Tidak Terbaca**:
+   - Pastikan tidak ada tanda kutip di sekitar nilai environment variables di Vercel
+
 ## Development
 
 Jalankan server development:

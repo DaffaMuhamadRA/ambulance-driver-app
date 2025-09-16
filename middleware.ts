@@ -4,48 +4,56 @@ import type { NextRequest } from "next/server"
 // We'll need to verify sessions differently in middleware
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  try {
+    const { pathname } = request.nextUrl
 
-  // Public routes that don't require authentication
-  const publicRoutes = [
-    "/login", 
-    "/api/auth/login", 
-    "/api/test-db", 
-    "/api/test-auth",
-    "/api/test-login"
-  ]
+    // Public routes that don't require authentication
+    const publicRoutes = [
+      "/login", 
+      "/api/auth/login", 
+      "/api/test-db", 
+      "/api/test-auth",
+      "/api/test-login",
+      "/unauthorized"
+    ]
 
-  // Check if this is a public route
-  const isPublicRoute = publicRoutes.includes(pathname) || 
-                        pathname.startsWith('/api/auth/') ||
-                        pathname.startsWith('/_next/') ||
-                        pathname.startsWith('/favicon.ico') ||
-                        pathname.endsWith('.html') ||
-                        pathname.startsWith('/images/') ||
-                        pathname.startsWith('/icons/')
-  
-  console.log("Middleware checking path:", pathname)
-  console.log("Is public route:", isPublicRoute)
-  
-  if (isPublicRoute) {
-    console.log("Allowing public route")
+    // Check if this is a public route
+    const isPublicRoute = publicRoutes.includes(pathname) || 
+                          pathname.startsWith('/api/auth/') ||
+                          pathname.startsWith('/_next/') ||
+                          pathname.startsWith('/favicon.ico') ||
+                          pathname.endsWith('.html') ||
+                          pathname.startsWith('/images/') ||
+                          pathname.startsWith('/icons/')
+    
+    console.log("Middleware checking path:", pathname)
+    console.log("Is public route:", isPublicRoute)
+    
+    if (isPublicRoute) {
+      console.log("Allowing public route")
+      return NextResponse.next()
+    }
+
+    // Get session token from cookies
+    const sessionToken = request.cookies.get("session")?.value
+
+    console.log("Session token from cookie:", sessionToken)
+
+    if (!sessionToken) {
+      console.log("No session token found, redirecting to login")
+      return NextResponse.redirect(new URL("/login", request.url))
+    }
+
+    // For now, we'll allow all non-public routes if there's a session token
+    // In a real application, we would verify the session token here
+    console.log("Session token found, allowing request")
+    return NextResponse.next()
+  } catch (error) {
+    console.error("Middleware error:", error)
+    // In case of middleware error, allow the request to proceed
+    // This prevents blocking users due to middleware issues
     return NextResponse.next()
   }
-
-  // Get session token from cookies
-  const sessionToken = request.cookies.get("session")?.value
-
-  console.log("Session token from cookie:", sessionToken)
-
-  if (!sessionToken) {
-    console.log("No session token found, redirecting to login")
-    return NextResponse.redirect(new URL("/login", request.url))
-  }
-
-  // For now, we'll allow all non-public routes if there's a session token
-  // In a real application, we would verify the session token here
-  console.log("Session token found, allowing request")
-  return NextResponse.next()
 }
 
 export const config = {
