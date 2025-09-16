@@ -2,6 +2,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 export default function UnauthorizedPage() {
+  console.log("UnauthorizedPage rendered");
+  
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md">

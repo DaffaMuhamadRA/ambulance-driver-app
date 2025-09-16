@@ -1,10 +1,62 @@
 import { redirect } from "next/navigation"
-import { getCurrentUser } from "@/lib/auth"
+import { cookies } from "next/headers"
+import { BASE_URL } from "@/lib/config"
 import LoginForm from "@/components/login-form"
 
+interface User {
+  id: number
+  name: string
+  email: string
+  role: "driver" | "admin"
+  status: string
+  photo?: string
+}
+
+// Function to get current user from session
+async function getCurrentUser(): Promise<User | null> {
+  try {
+    // Get session token from cookies
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get("session")?.value
+
+    if (!sessionToken) {
+      return null
+    }
+
+    // Use the session token to get the user directly from the database
+    // This avoids issues with fetch calls not preserving cookies
+    const { sql } = await import("@/lib/db")
+    
+    const result = await sql`
+      SELECT 
+        s.id, s.user_id, s.session_token, s.expires_at,
+        u.id as user_id, u.name, u.email, u.id_cms_privileges, u.status, u.photo
+      FROM sessions s
+      JOIN cms_users u ON s.user_id = u.id
+      WHERE s.session_token = ${sessionToken} AND s.expires_at > NOW() AND u.status = 'Active'
+    `
+
+    if (result.length === 0) return null
+
+    const row = result[0]
+    return {
+      id: row.user_id,
+      name: row.name,
+      email: row.email,
+      role: row.id_cms_privileges == 1 ? "admin" : "driver",
+      status: row.status,
+      photo: row.photo,
+    }
+  } catch (error) {
+    console.error("Error getting current user:", error)
+    return null
+  }
+}
+
 export default async function LoginPage() {
-  // Redirect if already logged in
+  // Check if user is already logged in by checking the session directly
   const user = await getCurrentUser()
+
   if (user) {
     redirect(user.role === "admin" ? "/admin" : "/dashboard")
   }

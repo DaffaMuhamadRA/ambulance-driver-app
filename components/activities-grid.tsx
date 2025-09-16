@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import type { Activity } from "@/lib/activities"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import Link from "next/link"
 
 interface ActivitiesGridProps {
   activities: Activity[]
@@ -166,7 +167,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false }: Activiti
                 <div className="mb-4">
                   <p className="text-gray-500 text-sm">{formatDate(activity.tgl_berangkat)}</p>
                   <p className="font-bold text-gray-800 text-lg">{activity.ambulance.nopol}</p>
-                  {isAdmin && <p className="text-sm text-gray-600">Driver: {activity.user.full_name}</p>}
+                  {isAdmin && <p className="text-sm text-gray-600">Driver: {activity.user.name}</p>}
                 </div>
                 <div className="text-sm text-gray-700 space-y-3 flex-grow">
                   <p>
@@ -188,26 +189,28 @@ export default function ActivitiesGrid({ activities, isAdmin = false }: Activiti
                 </div>
               </div>
               <div className="bg-gray-50 px-4 py-3 flex items-center justify-end space-x-2 rounded-b-lg border-t border-gray-200">
-                <button
-                  className="p-2 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
-                  title="Lihat Detail"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
+                <Link href={`/activities/${activity.id}`}>
+                  <button
+                    className="p-2 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
+                    title="Lihat Detail"
                   >
-                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                </button>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </Link>
                 <button
                   className="p-2 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
                   title="Edit"

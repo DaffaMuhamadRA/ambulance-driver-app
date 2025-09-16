@@ -1,11 +1,106 @@
-import { requireRole } from "@/lib/auth"
-import { getAllActivities } from "@/lib/activities"
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/useAuth"
 import DashboardLayout from "@/components/dashboard-layout"
 import ActivitiesTable from "@/components/activities-table"
 
-export default async function AdminPage() {
-  const user = await requireRole("admin")
-  const activities = await getAllActivities()
+interface Activity {
+  id: number
+  tgl_berangkat: string
+  tgl_pulang: string
+  detail: string
+  dari: string
+  tujuan: string
+  jam_berangkat: string
+  jam_pulang: string
+  tipe: string
+  reward: number
+  km_awal: number
+  km_akhir: number
+  nama_pemesan: string
+  hp: string
+  nama_pm: string
+  area?: string
+  asisten_luar_kota?: string
+  alamat_pm?: string
+  jenis_kelamin_pm?: string
+  usia_pm?: number
+  nik?: string
+  no_kk?: string
+  tempat_lahir?: string
+  tgl_lahir?: string
+  status_marital?: string
+  kegiatan?: string
+  rumpun_program?: string
+  diagnosa_sakit?: string
+  agama?: string
+  infaq?: number
+  biaya_dibayar?: number
+  id_asnaf?: number
+  ambulance: {
+    id: number
+    nopol: string
+    kode: string
+  }
+  user: {
+    id: number
+    name: string
+  }
+}
+
+export default function AdminPage() {
+  const router = useRouter()
+  const { user, loading } = useAuth()
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [activitiesLoading, setActivitiesLoading] = useState(true)
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login")
+      return
+    }
+    
+    // Check if user is driver (should be redirected)
+    if (user && user.role !== "admin") {
+      router.push("/dashboard")
+      return
+    }
+    
+    if (user) {
+      fetchAdminActivities()
+    }
+  }, [user, loading])
+
+  const fetchAdminActivities = async () => {
+    try {
+      setActivitiesLoading(true)
+      const response = await fetch("/api/admin/activities")
+      if (response.ok) {
+        const data = await response.json()
+        setActivities(data)
+      } else {
+        console.error("Failed to fetch activities")
+      }
+    } catch (error) {
+      console.error("Error fetching activities:", error)
+    } finally {
+      setActivitiesLoading(false)
+    }
+  }
+
+  if (loading || activitiesLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   return (
     <DashboardLayout user={user}>

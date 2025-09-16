@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-// Note: We can't use getSession in middleware because it's an async server component function
-// We'll need to verify sessions differently in middleware
 
 export async function middleware(request: NextRequest) {
   try {
@@ -26,45 +24,39 @@ export async function middleware(request: NextRequest) {
                           pathname.startsWith('/images/') ||
                           pathname.startsWith('/icons/')
     
-    console.log("Middleware checking path:", pathname)
-    console.log("Is public route:", isPublicRoute)
-    
+    // Don't apply middleware to public routes
     if (isPublicRoute) {
-      console.log("Allowing public route")
       return NextResponse.next()
     }
 
     // Get session token from cookies
     const sessionToken = request.cookies.get("session")?.value
 
-    console.log("Session token from cookie:", sessionToken)
-
+    // If no session token, redirect to login
     if (!sessionToken) {
-      console.log("No session token found, redirecting to login")
       return NextResponse.redirect(new URL("/login", request.url))
     }
 
-    // For now, we'll allow all non-public routes if there's a session token
-    // In a real application, we would verify the session token here
-    console.log("Session token found, allowing request")
+    // For authenticated users, allow access to all routes
+    // Role-based access control is handled at the page level
     return NextResponse.next()
   } catch (error) {
     console.error("Middleware error:", error)
     // In case of middleware error, allow the request to proceed
-    // This prevents blocking users due to middleware issues
     return NextResponse.next()
   }
 }
 
+// Configure which paths the middleware should run on
 export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
+     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
      */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 }

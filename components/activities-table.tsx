@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import type { Activity } from "@/lib/activities"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import Link from "next/link"
 
 interface ActivitiesTableProps {
   activities: Activity[]
@@ -22,7 +23,7 @@ export default function ActivitiesTable({ activities }: ActivitiesTableProps) {
       activity.dari.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.tujuan.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.ambulance.nopol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.user.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+      activity.user.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const totalPages = Math.ceil(filteredActivities.length / itemsPerPage)
@@ -205,8 +206,8 @@ export default function ActivitiesTable({ activities }: ActivitiesTableProps) {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-900 w-24">
-                      <div className="truncate" title={activity.user.full_name}>
-                        {activity.user.full_name}
+                      <div className="truncate" title={activity.user.name}>
+                        {activity.user.name}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-900 w-24">
@@ -243,12 +244,14 @@ export default function ActivitiesTable({ activities }: ActivitiesTableProps) {
                     </td>
                     <td className="px-4 py-4 text-sm font-medium w-20">
                       <div className="flex space-x-1">
-                        <button className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50" title="Lihat Detail">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        </button>
+                        <Link href={`/admin/activities/${activity.id}`}>
+                          <button className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50" title="Lihat Detail">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
+                        </Link>
                         <button className="text-yellow-600 hover:text-yellow-900 p-1 rounded hover:bg-yellow-50" title="Edit">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />

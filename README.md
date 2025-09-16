@@ -182,6 +182,17 @@ Jalankan server produksi:
 npm start
 ```
 
+### Dynamic Base URL Configuration
+
+This project uses a dynamic base URL configuration that automatically adapts to the current port without requiring manual updates. The configuration is handled in `lib/config.ts` and works as follows:
+
+1. In browser environments, it uses `window.location.origin`
+2. In development, it automatically detects the port from the `PORT` environment variable
+3. For Vercel deployments, it uses the `VERCEL_URL` environment variable
+4. As a fallback, it defaults to `http://localhost:3000`
+
+This eliminates the need to manually update `NEXT_PUBLIC_BASE_URL` in the `.env` file when the development server runs on different ports.
+
 ## Skrip Database Utility
 
 Beberapa skrip yang tersedia untuk memeriksa dan mengelola database:

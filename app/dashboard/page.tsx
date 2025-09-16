@@ -1,11 +1,109 @@
-import { requireRole } from "@/lib/auth"
-import { getActivities } from "@/lib/activities"
-import DashboardLayout from "@/components/dashboard-layout"
-import ActivitiesGrid from "@/components/activities-grid"
+"use client"
 
-export default async function DashboardPage() {
-  const user = await requireRole("driver")
-  const activities = await getActivities(user.id)
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/useAuth"
+import ActivitiesGrid from "@/components/activities-grid"
+import { Button } from "@/components/ui/button"
+import DashboardLayout from "@/components/dashboard-layout"
+import { BASE_URL } from "@/lib/config"
+
+interface Activity {
+  id: number
+  tgl_berangkat: string
+  tgl_pulang: string
+  detail: string
+  dari: string
+  tujuan: string
+  jam_berangkat: string
+  jam_pulang: string
+  tipe: string
+  reward: number
+  km_awal: number
+  km_akhir: number
+  nama_pemesan: string
+  hp: string
+  nama_pm: string
+  area?: string
+  asisten_luar_kota?: string
+  alamat_pm?: string
+  jenis_kelamin_pm?: string
+  usia_pm?: number
+  nik?: string
+  no_kk?: string
+  tempat_lahir?: string
+  tgl_lahir?: string
+  status_marital?: string
+  kegiatan?: string
+  rumpun_program?: string
+  diagnosa_sakit?: string
+  agama?: string
+  infaq?: number
+  biaya_dibayar?: number
+  id_asnaf?: number
+  ambulance: {
+    id: number
+    nopol: string
+    kode: string
+  }
+  user: {
+    id: number
+    name: string
+  }
+}
+
+export default function DashboardPage() {
+  const router = useRouter()
+  const { user, loading } = useAuth()
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [activitiesLoading, setActivitiesLoading] = useState(true)
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login")
+    }
+  }, [user, loading, router])
+
+  useEffect(() => {
+    if (user && user.role === "driver") {
+      fetchDriverActivities()
+    }
+  }, [user])
+
+  const fetchDriverActivities = async () => {
+    try {
+      setActivitiesLoading(true)
+      const response = await fetch(`${BASE_URL}/api/driver/activities`)
+      if (response.ok) {
+        const data = await response.json()
+        setActivities(data)
+      } else {
+        console.error("Failed to fetch activities")
+      }
+    } catch (error) {
+      console.error("Error fetching activities:", error)
+    } finally {
+      setActivitiesLoading(false)
+    }
+  }
+
+  if (loading || activitiesLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
+
+  // Check if user is admin (should be redirected)
+  if (user.role === "admin") {
+    router.push("/admin")
+    return null
+  }
 
   return (
     <DashboardLayout user={user}>
@@ -24,19 +122,19 @@ export default async function DashboardPage() {
               strokeLinejoin="round"
               className="h-6 w-6 text-gray-700"
             >
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
             </svg>
-            <h1 className="text-2xl font-bold text-gray-800">Aktivitas</h1>
+            <h1 className="text-2xl font-bold text-gray-800">Aktivitas Saya</h1>
           </div>
           <div className="text-sm text-gray-500 hidden md:block">
             <span>Home</span> <span className="mx-2">/</span>{" "}
             <span className="text-gray-900 font-semibold">Aktivitas</span>
           </div>
         </div>
-      </div>
-
-      <div className="mt-6">
-        <ActivitiesGrid activities={activities} />
+        <div className="mt-6">
+          <ActivitiesGrid activities={activities} />
+        </div>
       </div>
     </DashboardLayout>
   )
