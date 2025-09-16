@@ -50,7 +50,7 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
 
           <div className="p-4 flex flex-col items-center border-b border-gray-700">
             <img
-              src="/placeholder.svg?height=80&width=80&text=AS"
+              src="/placeholder-user.jpg"
               alt="User Avatar"
               className="w-20 h-20 rounded-full"
             />
@@ -214,7 +214,7 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
                 </button>
                 <div className="flex items-center">
                   <img
-                    src="/placeholder.svg?height=32&width=32&text=AS"
+                    src="/placeholder-user.jpg"
                     alt="User Avatar"
                     className="w-8 h-8 rounded-full"
                   />

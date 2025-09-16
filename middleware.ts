@@ -15,16 +15,23 @@ export async function middleware(request: NextRequest) {
       "/unauthorized"
     ]
 
-    // Check if this is a public route
+    // Check if this is a public route or static asset
     const isPublicRoute = publicRoutes.includes(pathname) || 
                           pathname.startsWith('/api/auth/') ||
                           pathname.startsWith('/_next/') ||
                           pathname.startsWith('/favicon.ico') ||
-                          pathname.endsWith('.html') ||
+                          pathname.endsWith('.css') ||
+                          pathname.endsWith('.js') ||
+                          pathname.endsWith('.png') ||
+                          pathname.endsWith('.jpg') ||
+                          pathname.endsWith('.jpeg') ||
+                          pathname.endsWith('.gif') ||
+                          pathname.endsWith('.svg') ||
+                          pathname.endsWith('.ico') ||
                           pathname.startsWith('/images/') ||
-                          pathname.startsWith('/icons/')
+                          pathname.startsWith('/icons/') 
     
-    // Don't apply middleware to public routes
+    // Don't apply middleware to public routes and static assets
     if (isPublicRoute) {
       return NextResponse.next()
     }
