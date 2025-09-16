@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import type { Activity } from "@/lib/activities"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false }: Activiti
   const [itemsPerPage, setItemsPerPage] = useState(6)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [searchTerm, setSearchTerm] = useState("")
+  const gridRef = useRef<HTMLDivElement>(null)
 
   // Filter activities based on search term
   const filteredActivities = activities.filter(
@@ -28,6 +29,13 @@ export default function ActivitiesGrid({ activities, isAdmin = false }: Activiti
   const totalPages = Math.ceil(filteredActivities.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const currentActivities = filteredActivities.slice(startIndex, startIndex + itemsPerPage)
+
+  // Scroll to top when currentPage changes
+  useEffect(() => {
+    if (gridRef.current) {
+      gridRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [currentPage])
 
   const getDetailStyles = (detail: string) => {
     switch (detail) {
@@ -64,8 +72,16 @@ export default function ActivitiesGrid({ activities, isAdmin = false }: Activiti
     return timeString.slice(0, 5) // Remove seconds
   }
 
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1))
+  }
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+  }
+
   return (
-    <div>
+    <div ref={gridRef}>
       <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
         <div className="flex items-center gap-2">
           <Button className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-sm">
@@ -251,7 +267,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false }: Activiti
         <div className="flex justify-center items-center mt-6 pt-4 border-t border-gray-200 space-x-4 text-sm">
           <Button
             variant="outline"
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onClick={handlePreviousPage}
             disabled={currentPage === 1}
             className="px-4 py-2 bg-white border border-gray-300 rounded-md disabled:opacity-50 hover:bg-gray-50 shadow-sm"
           >
@@ -262,7 +278,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false }: Activiti
           </span>
           <Button
             variant="outline"
-            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            onClick={handleNextPage}
             disabled={currentPage === totalPages}
             className="px-4 py-2 bg-white border border-gray-300 rounded-md disabled:opacity-50 hover:bg-gray-50 shadow-sm"
           >

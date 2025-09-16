@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/auth"
 import { getAllActivities } from "@/lib/activities"
 import DashboardLayout from "@/components/dashboard-layout"
-import ActivitiesGrid from "@/components/activities-grid"
+import ActivitiesTable from "@/components/activities-table"
 
 export default async function AdminPage() {
   const user = await requireRole("admin")
@@ -38,7 +38,7 @@ export default async function AdminPage() {
       </div>
 
       <div className="mt-6">
-        <ActivitiesGrid activities={activities} isAdmin={true} />
+        <ActivitiesTable activities={activities} />
       </div>
     </DashboardLayout>
   )

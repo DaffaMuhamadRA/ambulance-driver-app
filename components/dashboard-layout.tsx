@@ -54,7 +54,7 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
               alt="User Avatar"
               className="w-20 h-20 rounded-full"
             />
-            <h3 className="mt-2 font-semibold">{user.full_name}</h3>
+            <h3 className="mt-2 font-semibold">{user.name}</h3>
             <div className="flex items-center mt-1">
               <span className="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
               <span className="text-sm text-gray-400">Online</span>
@@ -218,7 +218,7 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
                     alt="User Avatar"
                     className="w-8 h-8 rounded-full"
                   />
-                  <span className="ml-2 font-semibold text-sm hidden md:block">{user.full_name}</span>
+                  <span className="ml-2 font-semibold text-sm hidden md:block">{user.name}</span>
                 </div>
               </div>
             </div>

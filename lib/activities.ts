@@ -1,6 +1,4 @@
-import { neon } from "@neondatabase/serverless"
-
-const sql = neon(process.env.DATABASE_URL!)
+import { sql } from "./db";
 
 export interface Activity {
   id: number
@@ -13,6 +11,11 @@ export interface Activity {
   jam_pulang: string
   tipe: string
   reward: number
+  km_awal: number
+  km_akhir: number
+  nama_pemesan: string
+  hp: string
+  nama_pm: string
   ambulance: {
     id: number
     nopol: string
@@ -28,15 +31,17 @@ export interface Activity {
 export async function getActivities(userId: number): Promise<Activity[]> {
   const result = await sql`
     SELECT 
-      a.id, a.tgl_berangkat, a.tgl_pulang, a.detail, a.dari, a.tujuan,
-      a.jam_berangkat, a.jam_pulang, a.tipe, a.reward,
-      amb.id as ambulance_id, amb.nopol, amb.kode,
-      u.id as user_id, u.full_name
-    FROM activities a
-    JOIN ambulances amb ON a.ambulance_id = amb.id
-    JOIN users u ON a.user_id = u.id
-    WHERE a.user_id = ${userId}
-    ORDER BY a.tgl_berangkat DESC, a.jam_berangkat DESC
+      a.id, a.tgl as tgl_berangkat, a.tgl_pulang, da.detail_antar as detail, a.dari,
+      a.tujuan, a.jam_berangkat, a.jam_pulang, 'Ambulan' as tipe, a.biaya_antar as reward,
+      a.km_awal, a.km_akhir, a.nama_pemesan, a.hp, a.nama_pm,
+      amb.id as ambulance_id, amb.nopol, '' as kode,
+      u.id as user_id, u.name as full_name
+    FROM ambulan_activity a
+    JOIN detail_antar da ON a.id_detail = da.id
+    JOIN ambulan amb ON a.id_ambulan = amb.id
+    JOIN cms_users u ON a.id_driver = u.id
+    WHERE a.id_driver = ${userId}
+    ORDER BY a.tgl DESC, a.jam_berangkat DESC
   `
 
   return result.map((row) => ({
@@ -50,6 +55,11 @@ export async function getActivities(userId: number): Promise<Activity[]> {
     jam_pulang: row.jam_pulang,
     tipe: row.tipe,
     reward: row.reward,
+    km_awal: row.km_awal,
+    km_akhir: row.km_akhir,
+    nama_pemesan: row.nama_pemesan,
+    hp: row.hp,
+    nama_pm: row.nama_pm,
     ambulance: {
       id: row.ambulance_id,
       nopol: row.nopol,
@@ -66,14 +76,16 @@ export async function getActivities(userId: number): Promise<Activity[]> {
 export async function getAllActivities(): Promise<Activity[]> {
   const result = await sql`
     SELECT 
-      a.id, a.tgl_berangkat, a.tgl_pulang, a.detail, a.dari, a.tujuan,
-      a.jam_berangkat, a.jam_pulang, a.tipe, a.reward,
-      amb.id as ambulance_id, amb.nopol, amb.kode,
-      u.id as user_id, u.full_name
-    FROM activities a
-    JOIN ambulances amb ON a.ambulance_id = amb.id
-    JOIN users u ON a.user_id = u.id
-    ORDER BY a.tgl_berangkat DESC, a.jam_berangkat DESC
+      a.id, a.tgl as tgl_berangkat, a.tgl_pulang, da.detail_antar as detail, a.dari,
+      a.tujuan, a.jam_berangkat, a.jam_pulang, 'Ambulan' as tipe, a.biaya_antar as reward,
+      a.km_awal, a.km_akhir, a.nama_pemesan, a.hp, a.nama_pm,
+      amb.id as ambulance_id, amb.nopol, '' as kode,
+      u.id as user_id, u.name as full_name
+    FROM ambulan_activity a
+    JOIN detail_antar da ON a.id_detail = da.id
+    JOIN ambulan amb ON a.id_ambulan = amb.id
+    JOIN cms_users u ON a.id_driver = u.id
+    ORDER BY a.tgl DESC, a.jam_berangkat DESC
   `
 
   return result.map((row) => ({
@@ -87,6 +99,11 @@ export async function getAllActivities(): Promise<Activity[]> {
     jam_pulang: row.jam_pulang,
     tipe: row.tipe,
     reward: row.reward,
+    km_awal: row.km_awal,
+    km_akhir: row.km_akhir,
+    nama_pemesan: row.nama_pemesan,
+    hp: row.hp,
+    nama_pm: row.nama_pm,
     ambulance: {
       id: row.ambulance_id,
       nopol: row.nopol,
