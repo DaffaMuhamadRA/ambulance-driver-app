@@ -13,6 +13,7 @@ interface User {
   role: "driver" | "admin"
   status: string
   photo?: string
+  id_driver?: number
 }
 
 // Function to get current user from session
@@ -26,30 +27,16 @@ async function getCurrentUser(): Promise<User | null> {
       return null
     }
 
-    // Use the session token to get the user directly from the database
-    // This avoids issues with fetch calls not preserving cookies
-    const { sql } = await import("@/lib/db")
+    // Import the getSession function to ensure consistency
+    const { getSession } = await import("@/app/api/auth/session/route")
     
-    const result = await sql`
-      SELECT 
-        s.id, s.user_id, s.session_token, s.expires_at,
-        u.id as user_id, u.name, u.email, u.id_cms_privileges, u.status, u.photo
-      FROM sessions s
-      JOIN cms_users u ON s.user_id = u.id
-      WHERE s.session_token = ${sessionToken} AND s.expires_at > NOW() AND u.status = 'Active'
-    `
-
-    if (result.length === 0) return null
-
-    const row = result[0]
-    return {
-      id: row.user_id,
-      name: row.name,
-      email: row.email,
-      role: row.id_cms_privileges == 1 ? "admin" : "driver",
-      status: row.status,
-      photo: row.photo,
+    const session = await getSession(sessionToken)
+    
+    if (!session) {
+      return null
     }
+
+    return session.user
   } catch (error) {
     console.error("Error getting current user:", error)
     return null
@@ -71,8 +58,19 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
   
   const activity = await getActivityById(activityId)
   
-  if (!activity || activity.user.id !== user.id) {
+  if (!activity) {
     notFound()
+  }
+  
+  // For drivers, check if the activity belongs to them
+  // For admins, allow access to all activities
+  if (user.role === "driver") {
+    // Check if the activity's driver ID matches the current user's driver ID
+    // If user.id_driver is null/undefined, fallback to user.id for comparison
+    const userDriverId = user.id_driver || user.id
+    if (activity.user.id !== userDriverId) {
+      notFound()
+    }
   }
   
   const formatDate = (dateString: string) => {

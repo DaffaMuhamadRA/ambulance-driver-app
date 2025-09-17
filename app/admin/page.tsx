@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import DashboardLayout from "@/components/dashboard-layout"
 import ActivitiesTable from "@/components/activities-table"
+import { Button } from "@/components/ui/button"
 
 interface Activity {
   id: number
@@ -133,7 +134,9 @@ export default function AdminPage() {
       </div>
 
       <div className="mt-6">
-        <ActivitiesTable activities={activities} />
+        <ActivitiesTable 
+          activities={activities} 
+        />
       </div>
     </DashboardLayout>
   )

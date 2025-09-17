@@ -49,11 +49,16 @@ export async function GET(
     }
     
     // Check if the activity belongs to the user
-    if (activity.user.id !== session.user.id) {
-      return NextResponse.json(
-        { error: "Forbidden" },
-        { status: 403 }
-      )
+    if (session.user.role === "driver") {
+      // Check if the activity's driver ID matches the current user's driver ID
+      // If user.id_driver is null/undefined, fallback to user.id for comparison
+      const userDriverId = session.user.id_driver || session.user.id
+      if (activity.user.id !== userDriverId) {
+        return NextResponse.json(
+          { error: "Forbidden" },
+          { status: 403 }
+        )
+      }
     }
     
     return NextResponse.json(activity)

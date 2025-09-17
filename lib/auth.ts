@@ -9,6 +9,7 @@ export interface User {
   role: "driver" | "admin";
   status: string;
   photo?: string;
+  id_driver?: number;
 }
 
 export interface Session {
@@ -47,7 +48,7 @@ export async function createSession(userId: number): Promise<string> {
 export async function authenticateUser(identifier: string, password: string): Promise<User | null> {
   try {
     const result = await sql`
-      SELECT id, name, email, password, id_cms_privileges, status, photo
+      SELECT id, name, email, password, id_cms_privileges, status, photo, id_driver
       FROM cms_users 
       WHERE (name = ${identifier} OR email = ${identifier}) AND status = 'Active'
     `;
@@ -79,6 +80,7 @@ export async function authenticateUser(identifier: string, password: string): Pr
       role: user.id_cms_privileges == 1 ? "admin" : "driver",
       status: user.status,
       photo: user.photo,
+      id_driver: user.id_driver,
     };
   } catch (error) {
     console.error("Database error during authentication:", error);

@@ -10,9 +10,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Username dan password harus diisi" }, { status: 400 });
     }
 
-    console.log("Attempting to authenticate user:", username);
     const user = await authenticateUser(username, password);
-    console.log("Authentication result:", user);
 
     if (!user) {
       return NextResponse.json({ error: "Username atau password salah" }, { status: 401 });
@@ -20,7 +18,6 @@ export async function POST(request: NextRequest) {
 
     // Create session
     const sessionToken = await createSession(user.id);
-    console.log("Session created for user:", user.id, "with token:", sessionToken);
 
     // Set cookie
     const cookieStore = await cookies();

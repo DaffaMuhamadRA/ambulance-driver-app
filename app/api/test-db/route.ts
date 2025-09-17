@@ -1,29 +1,31 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { NextResponse } from "next/server"
+import { sql } from "@/lib/db"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Test database connection by querying a simple table
-    const result = await sql`SELECT 1 as connected`;
+    // Test database connection
+    const test = await sql`SELECT NOW() as current_time`
+    console.log("Database connection test:", test)
     
-    if (result.length > 0) {
-      return NextResponse.json({ 
-        success: true, 
-        message: "Database connection successful",
-        timestamp: new Date().toISOString()
-      });
-    } else {
-      return NextResponse.json({ 
-        success: false, 
-        error: "Database query returned no results"
-      }, { status: 500 });
-    }
-  } catch (error: any) {
-    console.error("Database connection test failed:", error);
+    // Check table structure
+    const columns = await sql`
+      SELECT column_name, data_type, is_nullable 
+      FROM information_schema.columns 
+      WHERE table_name = 'ambulan_activity' 
+      ORDER BY ordinal_position
+    `
+    console.log("Table columns:", columns)
+    
     return NextResponse.json({ 
-      success: false, 
-      error: "Database connection failed",
-      details: error.message
-    }, { status: 500 });
+      success: true, 
+      currentTime: test[0].current_time,
+      columns: columns 
+    })
+  } catch (error: any) {
+    console.error("Database test error:", error)
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    )
   }
 }

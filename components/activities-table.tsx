@@ -8,9 +8,10 @@ import Link from "next/link"
 
 interface ActivitiesTableProps {
   activities: Activity[]
+  onAddNew?: () => void
 }
 
-export default function ActivitiesTable({ activities }: ActivitiesTableProps) {
+export default function ActivitiesTable({ activities, onAddNew }: ActivitiesTableProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [searchTerm, setSearchTerm] = useState("")
@@ -82,6 +83,12 @@ export default function ActivitiesTable({ activities }: ActivitiesTableProps) {
         <h2 className="text-lg font-semibold text-gray-800">Daftar Aktivitas</h2>
         
         <div className="flex items-center gap-4 w-full md:w-auto">
+          <Link 
+            href="/activities/create"
+            className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-sm transition-colors"
+          >
+            + Tambah Data
+          </Link>
           <div className="relative w-full md:w-64">
             <Input
               type="text"

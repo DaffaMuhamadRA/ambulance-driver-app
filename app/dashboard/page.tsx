@@ -73,7 +73,7 @@ export default function DashboardPage() {
   const fetchDriverActivities = async () => {
     try {
       setActivitiesLoading(true)
-      const response = await fetch(`${BASE_URL}/api/driver/activities`)
+      const response = await fetch(`/api/driver/activities`)
       if (response.ok) {
         const data = await response.json()
         setActivities(data)
@@ -133,7 +133,9 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="mt-6">
-          <ActivitiesGrid activities={activities} />
+          <ActivitiesGrid 
+            activities={activities} 
+          />
         </div>
       </div>
     </DashboardLayout>

@@ -8,6 +8,7 @@ interface User {
   role: "driver" | "admin"
   status: string
   photo?: string
+  id_driver?: number
 }
 
 export function useAuth() {

@@ -9,6 +9,7 @@ export interface User {
   role: "driver" | "admin"
   status: string
   photo?: string
+  id_driver?: number
 }
 
 export interface Session {
@@ -24,7 +25,7 @@ export async function getSession(token: string): Promise<(Session & { user: User
     const result = await sql`
       SELECT 
         s.id, s.user_id, s.session_token, s.expires_at,
-        u.id as user_id, u.name, u.email, u.id_cms_privileges, u.status, u.photo
+        u.id as user_id, u.name, u.email, u.id_cms_privileges, u.status, u.photo, u.id_driver
       FROM sessions s
       JOIN cms_users u ON s.user_id = u.id
       WHERE s.session_token = ${token} AND s.expires_at > NOW() AND u.status = 'Active'
@@ -45,6 +46,7 @@ export async function getSession(token: string): Promise<(Session & { user: User
         role: row.id_cms_privileges == 1 ? "admin" : "driver",
         status: row.status,
         photo: row.photo,
+        id_driver: row.id_driver,
       },
     }
   } catch (error) {
