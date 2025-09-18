@@ -2,9 +2,11 @@ import { notFound, redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { BASE_URL } from "@/lib/config"
 import { getActivityById } from "@/lib/activities"
+import { sql } from "@/lib/db"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import DocumentationImage from "@/components/documentation-image"
 
 interface User {
   id: number
@@ -14,6 +16,57 @@ interface User {
   status: string
   photo?: string
   id_driver?: number
+}
+
+interface Activity {
+  id: number
+  tgl_berangkat: string
+  tgl_pulang: string
+  detail: string
+  dari: string
+  tujuan: string
+  jam_berangkat: string
+  jam_pulang: string
+  tipe: string
+  reward: number
+  km_awal: number
+  km_akhir: number
+  nama_pemesan: string
+  hp: string
+  nama_pm: string
+  // Additional fields for detail view
+  area?: string
+  asisten_luar_kota?: string
+  alamat_pm?: string
+  jenis_kelamin_pm?: string
+  usia_pm?: number
+  nik?: string
+  no_kk?: string
+  tempat_lahir?: string
+  tgl_lahir?: string
+  status_marital?: string
+  kegiatan?: string
+  rumpun_program?: string
+  diagnosa_sakit?: string
+  agama?: string
+  infaq?: number
+  biaya_dibayar?: number
+  id_asnaf?: number
+  ambulance: {
+    id: number
+    nopol: string
+    kode: string
+  }
+  user: {
+    id: number
+    name: string
+  }
+  // Documentation files
+  documentation?: Array<{
+    id: number
+    url: string
+    created_at: string
+  }>
 }
 
 // Function to get current user from session
@@ -43,6 +96,130 @@ async function getCurrentUser(): Promise<User | null> {
   }
 }
 
+// Get activity by ID with documentation
+async function getActivityByIdWithDocumentation(id: number): Promise<Activity | null> {
+  try {
+    // Get the base activity data
+    const activityResult = await sql`
+      SELECT 
+        a.id, a.tgl as tgl_berangkat, a.tgl_pulang, da.detail_antar as detail, a.dari,
+        a.tujuan, a.jam_berangkat, a.jam_pulang, 'Ambulan' as tipe, a.biaya_antar as reward,
+        a.km_awal, a.km_akhir, 
+        COALESCE(p.nama_pemesan, a.nama_pemesan) as nama_pemesan, 
+        COALESCE(p.hp, a.hp) as hp, 
+        COALESCE(pm.nama_pm, a.nama_pm) as nama_pm, 
+        a.area, a.asisten_luar_kota,
+        COALESCE(pm.alamat_pm, a.alamat_pm) as alamat_pm, 
+        COALESCE(pm.jenis_kelamin_pm, a.jenis_kelamin_pm) as jenis_kelamin_pm, 
+        COALESCE(pm.usia_pm, 
+          CASE 
+            WHEN a.usia_pm::TEXT ~ '^[0-9]+$' THEN a.usia_pm::INTEGER
+            ELSE NULL
+          END) as usia_pm, 
+        COALESCE(pm.nik, a.nik) as nik, 
+        COALESCE(pm.no_kk, a.no_kk) as no_kk, 
+        COALESCE(pm.tempat_lahir, a.tempat_lahir) as tempat_lahir, 
+        COALESCE(pm.tgl_lahir, 
+          CASE 
+            WHEN a.tgl_lahir::TEXT ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN a.tgl_lahir::DATE
+            ELSE NULL
+          END) as tgl_lahir,
+        COALESCE(pm.status_marital, a.status_marital) as status_marital, 
+        a.kegiatan, a.rumpun_program, a.diagnosa_sakit, 
+        COALESCE(pm.agama, a.agama) as agama, 
+        a.infaq, a.biaya_dibayar, 
+        COALESCE(pm.id_asnaf, 
+          CASE 
+            WHEN a.id_asnaf > 0 THEN a.id_asnaf
+            ELSE NULL
+          END) as id_asnaf,
+        amb.id as ambulance_id, amb.nopol, '' as kode,
+        a.id_driver as driver_id,
+        d.driver as driver_name
+      FROM ambulan_activity a
+      LEFT JOIN pemesan p ON a.id_pemesan = p.id
+      LEFT JOIN penerima_manfaat pm ON a.id_penerima_manfaat = pm.id
+      JOIN detail_antar da ON a.id_detail = da.id
+      JOIN ambulan amb ON a.id_ambulan = amb.id
+      LEFT JOIN driver d ON a.id_driver = d.id
+      WHERE a.id = ${id}
+    `
+
+    if (activityResult.length === 0) {
+      return null
+    }
+
+    const row = activityResult[0]
+    const activity: any = {
+      id: row.id,
+      tgl_berangkat: row.tgl_berangkat,
+      tgl_pulang: row.tgl_pulang,
+      detail: row.detail,
+      dari: row.dari,
+      tujuan: row.tujuan,
+      jam_berangkat: row.jam_berangkat,
+      jam_pulang: row.jam_pulang,
+      tipe: row.tipe,
+      reward: row.reward,
+      km_awal: row.km_awal,
+      km_akhir: row.km_akhir,
+      nama_pemesan: row.nama_pemesan,
+      hp: row.hp,
+      nama_pm: row.nama_pm,
+      area: row.area,
+      asisten_luar_kota: row.asisten_luar_kota,
+      alamat_pm: row.alamat_pm,
+      jenis_kelamin_pm: row.jenis_kelamin_pm,
+      usia_pm: row.usia_pm,
+      nik: row.nik,
+      no_kk: row.no_kk,
+      tempat_lahir: row.tempat_lahir,
+      tgl_lahir: row.tgl_lahir,
+      status_marital: row.status_marital,
+      kegiatan: row.kegiatan,
+      rumpun_program: row.rumpun_program,
+      diagnosa_sakit: row.diagnosa_sakit,
+      agama: row.agama,
+      infaq: row.infaq,
+      biaya_dibayar: row.biaya_dibayar,
+      id_asnaf: row.id_asnaf,
+      ambulance: {
+        id: row.ambulance_id,
+        nopol: row.nopol,
+        kode: row.kode,
+      },
+      user: {
+        id: row.driver_id,
+        name: row.driver_name || 'Unknown Driver',
+      },
+    }
+
+    // Get documentation files
+    try {
+      const documentationResult = await sql`
+        SELECT id, url, created_at
+        FROM dokumentasi_activity
+        WHERE id_activity = ${id}
+        ORDER BY created_at ASC
+      `
+      
+      activity.documentation = documentationResult.map((doc: any) => ({
+        id: doc.id,
+        url: doc.url,
+        created_at: doc.created_at
+      }))
+    } catch (docError) {
+      console.error("Error fetching documentation:", docError)
+      activity.documentation = []
+    }
+
+    return activity
+  } catch (error) {
+    console.error("Error in getActivityByIdWithDocumentation:", error)
+    return null
+  }
+}
+
 export default async function ActivityDetailPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser()
   
@@ -56,7 +233,7 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
     notFound()
   }
   
-  const activity = await getActivityById(activityId)
+  const activity = await getActivityByIdWithDocumentation(activityId)
   
   if (!activity) {
     notFound()
@@ -76,6 +253,7 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
   const formatDate = (dateString: string) => {
     if (!dateString) return "-"
     return new Date(dateString).toLocaleDateString("id-ID", {
+      timeZone: "Asia/Jakarta", // GMT + 7
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -120,26 +298,48 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-800">Informasi Aktivitas</h2>
-            <Link href="/dashboard">
-              <Button variant="outline" className="flex items-center gap-2">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="m12 19-7-7 7-7" />
-                  <path d="M19 12H5" />
-                </svg>
-                Kembali
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link href={`/activities/${activityId}/edit`}>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Edit
+                </Button>
+              </Link>
+              <Link href="/dashboard">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="m12 19-7-7 7-7" />
+                    <path d="M19 12H5" />
+                  </svg>
+                  Kembali
+                </Button>
+              </Link>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -328,6 +528,24 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
               </div>
             </div>
           </div>
+          
+          {/* Documentation Section */}
+          {activity.documentation && activity.documentation.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Dokumentasi</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {activity.documentation.map((doc: any) => (
+                  <div key={doc.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <DocumentationImage
+                      src={doc.url}
+                      alt={`Dokumentasi aktivitas ${activity.id}`}
+                      className="w-full h-48 object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

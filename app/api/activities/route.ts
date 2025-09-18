@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { getSession } from "@/app/api/auth/session/route"
+import { put } from '@vercel/blob'
 
 export async function POST(request: Request) {
   try {
@@ -27,7 +28,11 @@ export async function POST(request: Request) {
       )
     }
     
-    const body = await request.json()
+    // Parse form data
+    const formData = await request.formData()
+    const body = JSON.parse(formData.get("data") as string || "{}")
+    const documentationFiles = formData.getAll("documentation") as File[]
+    
     console.log("Received body:", body);
     
     // Extract fields from body with proper type handling
@@ -554,8 +559,37 @@ export async function POST(request: Request) {
       )
     }
     
+    // Get the inserted activity ID
+    const activityId = result[0].id;
     console.log("Insert result:", result);
-    return NextResponse.json({ id: result[0].id, message: "Activity created successfully" })
+    
+    // Process documentation files if any
+    if (documentationFiles && documentationFiles.length > 0) {
+      try {
+        console.log(`Processing ${documentationFiles.length} documentation files for activity ${activityId}`);
+        
+        // Process each documentation file
+        for (const file of documentationFiles) {
+          // Upload to Vercel Blob
+          const blob = await put(
+            `documentation/${activityId}/${file.name}`, 
+            file, 
+            { access: 'public' }
+          );
+          
+          // Save the URL to the database
+          await sql`
+            INSERT INTO dokumentasi_activity (id_activity, url)
+            VALUES (${activityId}, ${blob.url})
+          `;
+        }
+      } catch (docError: any) {
+        console.error("Error processing documentation:", docError);
+        // We don't return an error here because the activity was successfully created
+      }
+    }
+    
+    return NextResponse.json({ id: activityId, message: "Activity created successfully" })
   } catch (error: any) {
     console.error("Error creating activity:", error)
     console.error("Error stack:", error.stack)

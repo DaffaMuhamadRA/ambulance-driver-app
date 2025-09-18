@@ -109,6 +109,7 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
   const formatDate = (dateString: string) => {
     if (!dateString) return "-"
     return new Date(dateString).toLocaleDateString("id-ID", {
+      timeZone: "Asia/Jakarta", // GMT + 7
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -185,8 +186,49 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Informasi Aktivitas</h2>
-              <Link href="/admin">
-                <Button variant="outline" className="flex items-center gap-2">
+              <div className="flex gap-2">
+                <Link href={`/admin/activities/${activityId}/edit`}>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Edit
+                  </Button>
+                </Link>
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                  onClick={async () => {
+                    if (confirm("Apakah Anda yakin ingin menghapus aktivitas ini?")) {
+                      try {
+                        const response = await fetch(`/api/admin/activities/${activityId}`, {
+                          method: 'DELETE',
+                        });
+                        
+                        if (response.ok) {
+                          router.push('/admin');
+                        } else {
+                          alert("Gagal menghapus aktivitas");
+                        }
+                      } catch (error) {
+                        console.error("Error deleting activity:", error);
+                        alert("Terjadi kesalahan saat menghapus aktivitas");
+                      }
+                    }
+                  }}
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
@@ -199,12 +241,33 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
                     strokeLinejoin="round"
                     className="h-4 w-4"
                   >
-                    <path d="m12 19-7-7 7-7" />
-                    <path d="M19 12H5" />
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                   </svg>
-                  Kembali
+                  Hapus
                 </Button>
-              </Link>
+                <Link href="/admin">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="m12 19-7-7 7-7" />
+                      <path d="M19 12H5" />
+                    </svg>
+                    Kembali
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

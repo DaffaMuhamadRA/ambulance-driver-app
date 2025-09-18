@@ -61,7 +61,42 @@ interface Reward {
   reward: number | null
 }
 
-export default function CreateActivityPage() {
+interface Activity {
+  id: number
+  tgl: string
+  tgl_pulang: string
+  id_ambulan: number
+  id_detail: number
+  jam_berangkat: string
+  jam_pulang: string
+  id_driver: number
+  asisten_luar_kota: string
+  area: string
+  dari: string
+  tujuan: string
+  km_awal: number
+  km_akhir: number
+  biaya_antar: number
+  biaya_dibayar: number
+  id_pemesan: number
+  id_penerima_manfaat: number
+  infaq: number
+  id_reward: number
+  kegiatan: string
+  rumpun_program: string
+  id_kantor?: number
+  documentation?: Array<{
+    id: number
+    url: string
+    created_at: string
+  }>
+}
+
+interface ActivityDetail extends Activity {
+  tgl_berangkat: string
+}
+
+export default function AdminEditActivityPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { user, loading } = useAuth()
   const [kantors, setKantors] = useState<Kantor[]>([])
@@ -80,31 +115,29 @@ export default function CreateActivityPage() {
 
   // State for documentation files
   const [documentationFiles, setDocumentationFiles] = useState<File[]>([])
-
-  // Check if user is a driver
-  const isDriver = user?.role !== "admin";
+  const [existingDocumentation, setExistingDocumentation] = useState<Array<{id: number, url: string}>>([])
 
   // Form state
   const [formData, setFormData] = useState({
-    id_kantor: isDriver ? "1" : "", // Default kantor for drivers
+    id_kantor: "",
     tgl: "",
     tgl_pulang: "",
     id_ambulan: "",
     id_detail: "",
     jam_berangkat: "",
     jam_pulang: "",
-    id_driver: user?.role === "admin" ? "" : user?.id.toString() || "",
+    id_driver: "",
     asisten_luar_kota: "",
     area: "Dalam Kota",
     dari: "",
     tujuan: "",
     km_awal: "",
     km_akhir: "",
-    biaya_antar: "0", // This will be automatically calculated
-    biaya_dibayar: "0", // Default value
+    biaya_antar: "0",
+    biaya_dibayar: "0",
     id_pemesan: "",
     id_penerima_manfaat: "",
-    infaq: "0", // Default value
+    infaq: "0",
     id_reward: "",
     kegiatan: "pengantaran",
     rumpun_program: "kesehatan",
@@ -135,28 +168,83 @@ export default function CreateActivityPage() {
   const [selectedPemesan, setSelectedPemesan] = useState<Pemesan | null>(null)
   const [selectedPM, setSelectedPM] = useState<PenerimaManfaat | null>(null)
 
-  // Redirect if not authenticated
+  const activityId = parseInt(params.id)
+
+  // Redirect if not authenticated or not admin
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login")
+    } else if (user && user.role !== "admin") {
+      router.push("/unauthorized")
     }
   }, [user, loading, router])
 
-  // Debug modal states
+  // Fetch activity data for editing
   useEffect(() => {
-    console.log('showCreatePemesan:', showCreatePemesan);
-  }, [showCreatePemesan]);
-
-  useEffect(() => {
-    console.log('showCreatePM:', showCreatePM);
-  }, [showCreatePM]);
+    if (user && user.role === "admin" && !isNaN(activityId)) {
+      fetchActivityData()
+    }
+  }, [user, activityId])
 
   // Fetch reference data
   useEffect(() => {
-    if (user) {
+    if (user && user.role === "admin") {
       fetchReferenceData()
     }
   }, [user])
+
+  const fetchActivityData = async () => {
+    try {
+      setLoadingData(true)
+      const response = await fetch(`/api/admin/activities/${activityId}`)
+      
+      if (!response.ok) {
+        throw new Error("Gagal memuat data aktivitas")
+      }
+      
+      const activity: ActivityDetail = await response.json()
+      
+      // Set form data with activity values
+      setFormData({
+        id_kantor: activity.id_kantor?.toString() || "",
+        tgl: activity.tgl_berangkat || "",
+        tgl_pulang: activity.tgl_pulang || "",
+        id_ambulan: activity.id_ambulan?.toString() || "",
+        id_detail: activity.id_detail?.toString() || "",
+        jam_berangkat: activity.jam_berangkat || "",
+        jam_pulang: activity.jam_pulang || "",
+        id_driver: activity.id_driver?.toString() || "",
+        asisten_luar_kota: activity.asisten_luar_kota || "",
+        area: activity.area || "Dalam Kota",
+        dari: activity.dari || "",
+        tujuan: activity.tujuan || "",
+        km_awal: activity.km_awal?.toString() || "",
+        km_akhir: activity.km_akhir?.toString() || "",
+        biaya_antar: activity.biaya_antar?.toString() || "0",
+        biaya_dibayar: activity.biaya_dibayar?.toString() || "0",
+        id_pemesan: activity.id_pemesan?.toString() || "",
+        id_penerima_manfaat: activity.id_penerima_manfaat?.toString() || "",
+        infaq: activity.infaq?.toString() || "0",
+        id_reward: activity.id_reward?.toString() || "",
+        kegiatan: activity.kegiatan || "pengantaran",
+        rumpun_program: activity.rumpun_program || "kesehatan",
+      })
+      
+      // Set existing documentation
+      if (activity.documentation) {
+        setExistingDocumentation(activity.documentation)
+      }
+      
+      // Store activity data to be processed after reference data is loaded
+      // This will be handled in a useEffect that watches for pemesans and penerimaManfaats updates
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal memuat data aktivitas")
+      console.error(err)
+    } finally {
+      setLoadingData(false)
+    }
+  }
 
   const fetchReferenceData = async () => {
     try {
@@ -360,6 +448,38 @@ export default function CreateActivityPage() {
     }
   }
 
+  // Set selected pemesan and PM after both activity data and reference data are loaded
+  useEffect(() => {
+    // Only try to set selected pemesan and PM after both activity data and reference data are loaded
+    if (pemesans.length > 0 && penerimaManfaats.length > 0) {
+      // Get activity data from form state
+      const activityIdPemesan = formData.id_pemesan ? parseInt(formData.id_pemesan) : null;
+      const activityIdPM = formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null;
+      
+      // Set selected pemesan if it exists
+      if (activityIdPemesan) {
+        const pemesan = pemesans.find(p => p.id === activityIdPemesan);
+        if (pemesan) {
+          setSelectedPemesan(pemesan);
+        }
+      } else {
+        // Clear selected pemesan if no ID is set
+        setSelectedPemesan(null);
+      }
+      
+      // Set selected PM if it exists
+      if (activityIdPM) {
+        const pm = penerimaManfaats.find(p => p.id === activityIdPM);
+        if (pm) {
+          setSelectedPM(pm);
+        }
+      } else {
+        // Clear selected PM if no ID is set
+        setSelectedPM(null);
+      }
+    }
+  }, [pemesans, penerimaManfaats, formData.id_pemesan, formData.id_penerima_manfaat])
+
   const handleDocumentationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files)
@@ -369,6 +489,10 @@ export default function CreateActivityPage() {
   
   const removeDocumentationFile = (index: number) => {
     setDocumentationFiles(prev => prev.filter((_, i) => i !== index))
+  }
+  
+  const removeExistingDocumentation = (id: number) => {
+    setExistingDocumentation(prev => prev.filter(doc => doc.id !== id))
   }
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -385,12 +509,8 @@ export default function CreateActivityPage() {
     if (!formData.jam_pulang) errors.jam_pulang = true
     if (!formData.dari) errors.dari = true
     if (!formData.tujuan) errors.tujuan = true
-    
-    // Required for admin users
-    if (user?.role === "admin" && !formData.id_driver) errors.id_driver = true
-    
-    // Required for non-admin users
-    if (!isDriver && !formData.id_kantor) errors.id_kantor = true
+    if (!formData.id_driver) errors.id_driver = true
+    if (!formData.id_kantor) errors.id_kantor = true
     
     // Update validation errors state
     setValidationErrors(errors)
@@ -404,16 +524,11 @@ export default function CreateActivityPage() {
     try {
       setLoadingData(true)
       
-      // For non-admin users, use the id_driver from cms_users table
-      // For admin users, use the selected driver from the form
-      let driverId: string | null = user?.role === "admin" 
-        ? formData.id_driver 
-        : user?.id_driver?.toString() || null
-      
       // Prepare data to send with proper type conversions
       const dataToSend = {
         ...formData,
-        id_driver: driverId ? parseInt(driverId) : null,
+        id: activityId,
+        id_driver: formData.id_driver ? parseInt(formData.id_driver) : null,
         // Convert numeric fields properly
         km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
         km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
@@ -428,57 +543,39 @@ export default function CreateActivityPage() {
         id_penerima_manfaat: formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null
       }
       
-      // Log the asisten_luar_kota value specifically
-      console.log("Form asisten_luar_kota value:", formData.asisten_luar_kota);
-      console.log("Type of asisten_luar_kota:", typeof formData.asisten_luar_kota);
-      
-      console.log("Sending data to API:", dataToSend);
-      console.log("Raw form data:", formData);
-      console.log("User role:", user?.role);
-      console.log("Driver ID:", driverId);
-      
       // Create FormData object to send both data and files
       const formDataObj = new FormData()
       formDataObj.append("data", JSON.stringify(dataToSend))
       
-      // Add documentation files
+      // Add new documentation files
       documentationFiles.forEach(file => {
         formDataObj.append("documentation", file)
       })
       
-      const response = await fetch("/api/activities", {
-        method: "POST",
+      // Add existing documentation that wasn't removed
+      existingDocumentation.forEach(doc => {
+        formDataObj.append("existingDocumentation", doc.id.toString())
+      })
+      
+      const response = await fetch(`/api/admin/activities/${activityId}`, {
+        method: "PUT",
         body: formDataObj
       })
 
       if (response.ok) {
-        // Successfully created, redirect back to dashboard
-        if (user?.role === "admin") {
-          router.push("/admin")
-        } else {
-          router.push("/dashboard")
-        }
+        // Successfully updated, redirect back to detail page
+        router.push(`/admin/activities/${activityId}`)
       } else {
         const errorData = await response.json()
-        console.error("API Error Response:", errorData);
         // Create a more detailed error message
-        let errorMessage = errorData.error || "Gagal membuat aktivitas";
+        let errorMessage = errorData.error || "Gagal memperbarui aktivitas"
         if (errorData.details) {
-          errorMessage += `: ${errorData.details}`;
-        }
-        if (errorData.code) {
-          errorMessage += ` (Code: ${errorData.code})`;
-        }
-        if (errorData.detail) {
-          errorMessage += ` - Detail: ${errorData.detail}`;
-        }
-        if (errorData.hint) {
-          errorMessage += ` - Hint: ${errorData.hint}`;
+          errorMessage += `: ${errorData.details}`
         }
         throw new Error(errorMessage)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal membuat aktivitas")
+      setError(err instanceof Error ? err.message : "Gagal memperbarui aktivitas")
       console.error("Form Submission Error:", err)
     } finally {
       setLoadingData(false)
@@ -520,11 +617,11 @@ export default function CreateActivityPage() {
               <line x1="16" y1="17" x2="8" y2="17" />
               <polyline points="10 9 9 9 8 9" />
             </svg>
-            <h1 className="text-2xl font-bold text-gray-800">Tambah Aktivitas</h1>
+            <h1 className="text-2xl font-bold text-gray-800">Edit Aktivitas</h1>
           </div>
           <div className="text-sm text-gray-500 hidden md:block">
             <span>Home</span> <span className="mx-2">/</span>{" "}
-            <span className="text-gray-900 font-semibold">Tambah Aktivitas</span>
+            <span className="text-gray-900 font-semibold">Edit Aktivitas</span>
           </div>
         </div>
       </div>
@@ -544,29 +641,27 @@ export default function CreateActivityPage() {
         
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {/* Kantor - Only show for admin users */}
-            {!isDriver && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Kantor</label>
-                <select
-                  name="id_kantor"
-                  value={formData.id_kantor}
-                  onChange={handleInputChange}
-                  className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.id_kantor ? 'border-red-500' : 'border-gray-300'}`}
-                  required
-                >
-                  <option value="">Pilih Kantor</option>
-                  {kantors.map(kantor => (
-                    <option key={kantor.id} value={kantor.id}>
-                      {kantor.kantor}
-                    </option>
-                  ))}
-                </select>
-                {validationErrors.id_kantor && (
-                  <p className="mt-1 text-sm text-red-600">Kantor wajib dipilih</p>
-                )}
-              </div>
-            )}
+            {/* Kantor */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Kantor</label>
+              <select
+                name="id_kantor"
+                value={formData.id_kantor}
+                onChange={handleInputChange}
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.id_kantor ? 'border-red-500' : 'border-gray-300'}`}
+                required
+              >
+                <option value="">Pilih Kantor</option>
+                {kantors.map(kantor => (
+                  <option key={kantor.id} value={kantor.id}>
+                    {kantor.kantor}
+                  </option>
+                ))}
+              </select>
+              {validationErrors.id_kantor && (
+                <p className="mt-1 text-sm text-red-600">Kantor wajib dipilih</p>
+              )}
+            </div>
             
             {/* Tanggal */}
             <div>
@@ -660,32 +755,27 @@ export default function CreateActivityPage() {
               )}
             </div>
             
-            {/* Driver (only for admin) */}
-            {user?.role === "admin" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Driver</label>
-                <select
-                  name="id_driver"
-                  value={formData.id_driver}
-                  onChange={handleInputChange}
-                  className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.id_driver ? 'border-red-500' : 'border-gray-300'}`}
-                  required
-                >
-                  <option value="">Pilih Driver</option>
-                  {drivers.map(driver => (
-                    <option key={driver.id} value={driver.id}>
-                      {driver.name}
-                    </option>
-                  ))}
-                </select>
-                {validationErrors.id_driver && (
-                  <p className="mt-1 text-sm text-red-600">Driver wajib dipilih</p>
-                )}
-              </div>
-            )}
-            {user?.role !== "admin" && (
-              <input type="hidden" name="id_driver" value={user?.id} />
-            )}
+            {/* Driver */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Driver</label>
+              <select
+                name="id_driver"
+                value={formData.id_driver}
+                onChange={handleInputChange}
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.id_driver ? 'border-red-500' : 'border-gray-300'}`}
+                required
+              >
+                <option value="">Pilih Driver</option>
+                {drivers.map(driver => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.name}
+                  </option>
+                ))}
+              </select>
+              {validationErrors.id_driver && (
+                <p className="mt-1 text-sm text-red-600">Driver wajib dipilih</p>
+              )}
+            </div>
             
             {/* Jenis (Reward) - Diubah menjadi textbox */}
             <div>
@@ -799,26 +889,16 @@ export default function CreateActivityPage() {
               />
             </div>
             
-            {/* Biaya Antar - Read-only for drivers, auto-calculated */}
+            {/* Biaya Antar - Editable for admin */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Biaya Antar</label>
-              {isDriver ? (
-                <input
-                  type="number"
-                  name="biaya_antar"
-                  value={formData.biaya_antar}
-                  readOnly
-                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                />
-              ) : (
-                <input
-                  type="number"
-                  name="biaya_antar"
-                  value={formData.biaya_antar}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                />
-              )}
+              <input
+                type="number"
+                name="biaya_antar"
+                value={formData.biaya_antar}
+                onChange={handleInputChange}
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+              />
             </div>
             
             {/* Biaya yang Dibayar */}
@@ -842,17 +922,18 @@ export default function CreateActivityPage() {
                 placeholder="Cari atau ketik nama pemesan"
                 displayKey="nama_pemesan"
                 searchKeys={["nama_pemesan", "hp"]}
+                initialValue={selectedPemesan ? selectedPemesan.nama_pemesan : ""} // Add initial value
               />
             </div>
             
-            {/* Detail Pemesan (Read-only) */}
-            {selectedPemesan && (
+            {/* Detail Pemesan (Read-only) - Always show when there's existing data or when selected */}
+            {(selectedPemesan || formData.id_pemesan) && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
                   <input
                     type="text"
-                    value={selectedPemesan.nama_pemesan || "Tidak ada data"}
+                    value={selectedPemesan?.nama_pemesan || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -861,7 +942,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">No HP</label>
                   <input
                     type="text"
-                    value={selectedPemesan.hp || "Tidak ada data"}
+                    value={selectedPemesan?.hp || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -878,17 +959,18 @@ export default function CreateActivityPage() {
                 placeholder="Cari atau ketik nama PM"
                 displayKey="nama_pm"
                 searchKeys={["nama_pm"]}
+                initialValue={selectedPM ? selectedPM.nama_pm : ""} // Add initial value
               />
             </div>
             
-            {/* Detail PM (Read-only) */}
-            {selectedPM && (
+            {/* Detail PM (Read-only) - Always show when there's existing data or when selected */}
+            {(selectedPM || formData.id_penerima_manfaat) && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Nama PM</label>
                   <input
                     type="text"
-                    value={selectedPM.nama_pm || "Tidak ada data"}
+                    value={selectedPM?.nama_pm || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -897,7 +979,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Alamat PM</label>
                   <input
                     type="text"
-                    value={selectedPM.alamat_pm || "Tidak ada data"}
+                    value={selectedPM?.alamat_pm || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -906,7 +988,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Jenis Kelamin</label>
                   <input
                     type="text"
-                    value={selectedPM.jenis_kelamin_pm || "Tidak ada data"}
+                    value={selectedPM?.jenis_kelamin_pm || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -915,7 +997,11 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Usia</label>
                   <input
                     type="text"
-                    value={selectedPM.usia_pm !== undefined && selectedPM.usia_pm !== null ? selectedPM.usia_pm.toString() : "Tidak ada data"}
+                    value={
+                      selectedPM?.usia_pm !== undefined && selectedPM?.usia_pm !== null 
+                        ? selectedPM?.usia_pm.toString() 
+                        : "Tidak ada data"
+                    }
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -924,7 +1010,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">NIK</label>
                   <input
                     type="text"
-                    value={selectedPM.nik || "Tidak ada data"}
+                    value={selectedPM?.nik || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -933,7 +1019,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">No KK</label>
                   <input
                     type="text"
-                    value={selectedPM.no_kk || "Tidak ada data"}
+                    value={selectedPM?.no_kk || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -942,7 +1028,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Tempat Lahir</label>
                   <input
                     type="text"
-                    value={selectedPM.tempat_lahir || "Tidak ada data"}
+                    value={selectedPM?.tempat_lahir || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -951,7 +1037,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
                   <input
                     type="text"
-                    value={selectedPM.tgl_lahir || "Tidak ada data"}
+                    value={selectedPM?.tgl_lahir || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -960,7 +1046,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Status Marital</label>
                   <input
                     type="text"
-                    value={selectedPM.status_marital || "Tidak ada data"}
+                    value={selectedPM?.status_marital || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -969,7 +1055,7 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Agama</label>
                   <input
                     type="text"
-                    value={selectedPM.agama || "Tidak ada data"}
+                    value={selectedPM?.agama || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1055,6 +1141,44 @@ export default function CreateActivityPage() {
               </div>
             </div>
             
+            {/* Display existing documentation files */}
+            {existingDocumentation.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium text-gray-700">Dokumentasi yang sudah ada:</h4>
+                <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
+                  {existingDocumentation.map((doc) => (
+                    <li key={doc.id} className="flex items-center justify-between py-3 pl-3 pr-4 text-sm">
+                      <div className="flex w-0 flex-1 items-center">
+                        <svg
+                          className="h-5 w-5 flex-shrink-0 text-gray-400"
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <span className="ml-2 w-0 flex-1 truncate">{doc.url.split('/').pop()}</span>
+                      </div>
+                      <div className="ml-4 flex-shrink-0">
+                        <button
+                          type="button"
+                          className="font-medium text-red-600 hover:text-red-500"
+                          onClick={() => removeExistingDocumentation(doc.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
             {/* Display selected files */}
             {documentationFiles.length > 0 && (
               <div className="mt-4">
@@ -1098,13 +1222,7 @@ export default function CreateActivityPage() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                if (user?.role === "admin") {
-                  router.push("/admin")
-                } else {
-                  router.push("/dashboard")
-                }
-              }}
+              onClick={() => router.push(`/admin/activities/${activityId}`)}
             >
               Batal
             </Button>
@@ -1333,3 +1451,5 @@ export default function CreateActivityPage() {
     </DashboardLayout>
   )
 }
+
+
