@@ -923,6 +923,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 displayKey="nama_pemesan"
                 searchKeys={["nama_pemesan", "hp"]}
                 initialValue={selectedPemesan ? selectedPemesan.nama_pemesan : ""} // Add initial value
+                onCreate={() => setShowCreatePemesan(true)}
               />
             </div>
             
@@ -960,6 +961,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 displayKey="nama_pm"
                 searchKeys={["nama_pm"]}
                 initialValue={selectedPM ? selectedPM.nama_pm : ""} // Add initial value
+                onCreate={() => setShowCreatePM(true)}
               />
             </div>
             

@@ -880,6 +880,7 @@ export default function CreateActivityPage() {
                 placeholder="Cari atau ketik nama pemesan"
                 displayKey="nama_pemesan"
                 searchKeys={["nama_pemesan", "hp"]}
+                onCreate={() => setShowCreatePemesan(true)}
               />
             </div>
 
@@ -916,6 +917,7 @@ export default function CreateActivityPage() {
                 placeholder="Cari atau ketik nama PM"
                 displayKey="nama_pm"
                 searchKeys={["nama_pm"]}
+                onCreate={() => setShowCreatePM(true)}
               />
             </div>
 

@@ -100,6 +100,10 @@ export default function LiveSearchInput({
                     {item[displayKey]}
                   </div>
                 ))
+              ) : searchTerm ? (
+                <div className="px-4 py-2 text-gray-500">
+                  No results found
+                </div>
               ) : (
                 <div className="px-4 py-2 text-gray-500">
                   No results found
