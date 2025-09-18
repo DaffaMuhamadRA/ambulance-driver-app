@@ -1,11 +1,14 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import LiveSearchInput from "@/components/live-search-input"
+import FileUpload from "@/components/file-upload"
 
 // Interface definitions
 interface Kantor {
@@ -78,11 +81,8 @@ export default function CreateActivityPage() {
   const [error, setError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
 
-  // State for documentation files
-  const [documentationFiles, setDocumentationFiles] = useState<File[]>([])
-
   // Check if user is a driver
-  const isDriver = user?.role !== "admin";
+  const isDriver = user?.role !== "admin"
 
   // Form state
   const [formData, setFormData] = useState({
@@ -113,7 +113,7 @@ export default function CreateActivityPage() {
   // New pemesan form state
   const [newPemesan, setNewPemesan] = useState({
     nama_pemesan: "",
-    hp: ""
+    hp: "",
   })
 
   // New penerima manfaat form state
@@ -128,12 +128,15 @@ export default function CreateActivityPage() {
     tempat_lahir: "",
     tgl_lahir: "",
     status_marital: "",
-    agama: ""
+    agama: "",
   })
 
   // State untuk menyimpan data pemesan dan PM yang dipilih
   const [selectedPemesan, setSelectedPemesan] = useState<Pemesan | null>(null)
   const [selectedPM, setSelectedPM] = useState<PenerimaManfaat | null>(null)
+
+  const [documentationFiles, setDocumentationFiles] = useState<File[]>([])
+  const [uploadingFiles, setUploadingFiles] = useState(false)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -144,12 +147,12 @@ export default function CreateActivityPage() {
 
   // Debug modal states
   useEffect(() => {
-    console.log('showCreatePemesan:', showCreatePemesan);
-  }, [showCreatePemesan]);
+    console.log("showCreatePemesan:", showCreatePemesan)
+  }, [showCreatePemesan])
 
   useEffect(() => {
-    console.log('showCreatePM:', showCreatePM);
-  }, [showCreatePM]);
+    console.log("showCreatePM:", showCreatePM)
+  }, [showCreatePM])
 
   // Fetch reference data
   useEffect(() => {
@@ -161,18 +164,9 @@ export default function CreateActivityPage() {
   const fetchReferenceData = async () => {
     try {
       setLoadingData(true)
-      
+
       // Fetch all reference data in parallel
-      const [
-        kantorRes,
-        ambulanRes,
-        detailRes,
-        driverRes,
-        pemesanRes,
-        pmRes,
-        asnafRes,
-        rewardRes
-      ] = await Promise.all([
+      const [kantorRes, ambulanRes, detailRes, driverRes, pemesanRes, pmRes, asnafRes, rewardRes] = await Promise.all([
         fetch("/api/reference/kantors"),
         fetch("/api/reference/ambulans"),
         fetch("/api/reference/details"),
@@ -180,7 +174,7 @@ export default function CreateActivityPage() {
         fetch("/api/reference/pemesans"),
         fetch("/api/reference/penerima-manfaats"),
         fetch("/api/reference/asnafs"),
-        fetch("/api/reference/rewards")
+        fetch("/api/reference/rewards"),
       ])
 
       if (kantorRes.ok) setKantors(await kantorRes.json())
@@ -191,7 +185,7 @@ export default function CreateActivityPage() {
       if (pmRes.ok) setPenerimaManfaats(await pmRes.json())
       if (asnafRes.ok) setAsnafs(await asnafRes.json())
       if (rewardRes.ok) setRewards(await rewardRes.json())
-      
+
       setLoadingData(false)
     } catch (err) {
       setError("Gagal memuat data referensi")
@@ -202,9 +196,9 @@ export default function CreateActivityPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }))
     
     // Clear validation error for this field
@@ -261,10 +255,10 @@ export default function CreateActivityPage() {
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     // Temukan reward berdasarkan jenis dan tipe
-    const reward = rewards.find(r => `${r.jenis} - ${r.tipe}` === value)
-    setFormData(prev => ({
+    const reward = rewards.find((r) => `${r.jenis} - ${r.tipe}` === value)
+    setFormData((prev) => ({
       ...prev,
-      id_reward: reward ? reward.id.toString() : ""
+      id_reward: reward ? reward.id.toString() : "",
     }))
   }
 
@@ -274,19 +268,19 @@ export default function CreateActivityPage() {
       const response = await fetch("/api/reference/pemesans", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(newPemesan)
+        body: JSON.stringify(newPemesan),
       })
 
       if (response.ok) {
         const createdPemesan = await response.json()
         // Add to pemesans list
-        setPemesans(prev => [...prev, createdPemesan])
+        setPemesans((prev) => [...prev, createdPemesan])
         // Set as selected
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          id_pemesan: createdPemesan.id.toString()
+          id_pemesan: createdPemesan.id.toString(),
         }))
         // Update search field
         handlePemesanSelect(createdPemesan)
@@ -295,7 +289,7 @@ export default function CreateActivityPage() {
         // Reset form
         setNewPemesan({
           nama_pemesan: "",
-          hp: ""
+          hp: "",
         })
       } else {
         const errorData = await response.json()
@@ -313,24 +307,24 @@ export default function CreateActivityPage() {
       const response = await fetch("/api/reference/penerima-manfaats", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ...newPM,
           // Convert numeric fields
-          usia_pm: newPM.usia_pm ? parseInt(newPM.usia_pm) : null,
-          id_asnaf: newPM.id_asnaf ? parseInt(newPM.id_asnaf) : null
-        })
+          usia_pm: newPM.usia_pm ? Number.parseInt(newPM.usia_pm) : null,
+          id_asnaf: newPM.id_asnaf ? Number.parseInt(newPM.id_asnaf) : null,
+        }),
       })
 
       if (response.ok) {
         const createdPM = await response.json()
         // Add to penerima manfaats list
-        setPenerimaManfaats(prev => [...prev, createdPM])
+        setPenerimaManfaats((prev) => [...prev, createdPM])
         // Set as selected
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          id_penerima_manfaat: createdPM.id.toString()
+          id_penerima_manfaat: createdPM.id.toString(),
         }))
         // Update search field
         handlePMSelect(createdPM)
@@ -348,7 +342,7 @@ export default function CreateActivityPage() {
           tempat_lahir: "",
           tgl_lahir: "",
           status_marital: "",
-          agama: ""
+          agama: "",
         })
       } else {
         const errorData = await response.json()
@@ -360,17 +354,6 @@ export default function CreateActivityPage() {
     }
   }
 
-  const handleDocumentationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files)
-      setDocumentationFiles(prev => [...prev, ...files])
-    }
-  }
-  
-  const removeDocumentationFile = (index: number) => {
-    setDocumentationFiles(prev => prev.filter((_, i) => i !== index))
-  }
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -406,14 +389,12 @@ export default function CreateActivityPage() {
       
       // For non-admin users, use the id_driver from cms_users table
       // For admin users, use the selected driver from the form
-      let driverId: string | null = user?.role === "admin" 
-        ? formData.id_driver 
-        : user?.id_driver?.toString() || null
-      
+      const driverId: string | null = user?.role === "admin" ? formData.id_driver : user?.id_driver?.toString() || null
+
       // Prepare data to send with proper type conversions
       const dataToSend = {
         ...formData,
-        id_driver: driverId ? parseInt(driverId) : null,
+        id_driver: driverId ? Number.parseInt(driverId) : null,
         // Convert numeric fields properly
         km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
         km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
@@ -427,7 +408,7 @@ export default function CreateActivityPage() {
         id_pemesan: formData.id_pemesan ? parseInt(formData.id_pemesan) : null,
         id_penerima_manfaat: formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null
       }
-      
+
       // Log the asisten_luar_kota value specifically
       console.log("Form asisten_luar_kota value:", formData.asisten_luar_kota);
       console.log("Type of asisten_luar_kota:", typeof formData.asisten_luar_kota);
@@ -451,37 +432,75 @@ export default function CreateActivityPage() {
         body: formDataObj
       })
 
-      if (response.ok) {
-        // Successfully created, redirect back to dashboard
-        if (user?.role === "admin") {
-          router.push("/admin")
-        } else {
-          router.push("/dashboard")
-        }
-      } else {
+      if (!response.ok) {
         const errorData = await response.json()
-        console.error("API Error Response:", errorData);
+        console.error("API Error Response:", errorData)
         // Create a more detailed error message
-        let errorMessage = errorData.error || "Gagal membuat aktivitas";
+        let errorMessage = errorData.error || "Gagal membuat aktivitas"
         if (errorData.details) {
-          errorMessage += `: ${errorData.details}`;
+          errorMessage += `: ${errorData.details}`
         }
         if (errorData.code) {
-          errorMessage += ` (Code: ${errorData.code})`;
+          errorMessage += ` (Code: ${errorData.code})`
         }
         if (errorData.detail) {
-          errorMessage += ` - Detail: ${errorData.detail}`;
+          errorMessage += ` - Detail: ${errorData.detail}`
         }
         if (errorData.hint) {
-          errorMessage += ` - Hint: ${errorData.hint}`;
+          errorMessage += ` - Hint: ${errorData.hint}`
         }
         throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      const activityId = result.activity.id
+
+      if (documentationFiles.length > 0) {
+        setUploadingFiles(true)
+
+        // Upload files to blob storage
+        const formData = new FormData()
+        documentationFiles.forEach((file) => {
+          formData.append("files", file)
+        })
+
+        const uploadResponse = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (uploadResponse.ok) {
+          const uploadResult = await uploadResponse.json()
+
+          // Save documentation records to database
+          await fetch("/api/activities/dokumentasi", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              activityId: activityId,
+              files: uploadResult.files,
+            }),
+          })
+        }
+
+        setUploadingFiles(false)
+      }
+
+      alert("Aktivitas berhasil dibuat!")
+
+      if (user?.role === "admin") {
+        router.push("/admin")
+      } else {
+        router.push("/dashboard")
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal membuat aktivitas")
       console.error("Form Submission Error:", err)
     } finally {
       setLoadingData(false)
+      setUploadingFiles(false)
     }
   }
 
@@ -533,15 +552,12 @@ export default function CreateActivityPage() {
         {error && (
           <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-md">
             {error}
-            <button 
-              onClick={() => setError(null)}
-              className="ml-2 text-red-900 hover:text-red-700 font-bold"
-            >
+            <button onClick={() => setError(null)} className="ml-2 text-red-900 hover:text-red-700 font-bold">
               ×
             </button>
           </div>
         )}
-        
+
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {/* Kantor - Only show for admin users */}
@@ -556,7 +572,7 @@ export default function CreateActivityPage() {
                   required
                 >
                   <option value="">Pilih Kantor</option>
-                  {kantors.map(kantor => (
+                  {kantors.map((kantor) => (
                     <option key={kantor.id} value={kantor.id}>
                       {kantor.kantor}
                     </option>
@@ -567,7 +583,7 @@ export default function CreateActivityPage() {
                 )}
               </div>
             )}
-            
+
             {/* Tanggal */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Tanggal</label>
@@ -583,7 +599,7 @@ export default function CreateActivityPage() {
                 <p className="mt-1 text-sm text-red-600">Tanggal wajib diisi</p>
               )}
             </div>
-            
+
             {/* Ambulan */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Ambulan</label>
@@ -595,7 +611,7 @@ export default function CreateActivityPage() {
                 required
               >
                 <option value="">Pilih Ambulan</option>
-                {ambulans.map(ambulan => (
+                {ambulans.map((ambulan) => (
                   <option key={ambulan.id} value={ambulan.id}>
                     {ambulan.nopol}
                   </option>
@@ -605,7 +621,7 @@ export default function CreateActivityPage() {
                 <p className="mt-1 text-sm text-red-600">Ambulan wajib dipilih</p>
               )}
             </div>
-            
+
             {/* Detail */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Detail</label>
@@ -617,7 +633,7 @@ export default function CreateActivityPage() {
                 required
               >
                 <option value="">Pilih Detail</option>
-                {details.map(detail => (
+                {details.map((detail) => (
                   <option key={detail.id} value={detail.id}>
                     {detail.detail_antar}
                   </option>
@@ -627,7 +643,7 @@ export default function CreateActivityPage() {
                 <p className="mt-1 text-sm text-red-600">Detail wajib dipilih</p>
               )}
             </div>
-            
+
             {/* Jam Berangkat */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Jam Berangkat</label>
@@ -643,7 +659,7 @@ export default function CreateActivityPage() {
                 <p className="mt-1 text-sm text-red-600">Jam berangkat wajib diisi</p>
               )}
             </div>
-            
+
             {/* Jam Pulang */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Jam Pulang</label>
@@ -659,7 +675,7 @@ export default function CreateActivityPage() {
                 <p className="mt-1 text-sm text-red-600">Jam pulang wajib diisi</p>
               )}
             </div>
-            
+
             {/* Driver (only for admin) */}
             {user?.role === "admin" && (
               <div>
@@ -672,7 +688,7 @@ export default function CreateActivityPage() {
                   required
                 >
                   <option value="">Pilih Driver</option>
-                  {drivers.map(driver => (
+                  {drivers.map((driver) => (
                     <option key={driver.id} value={driver.id}>
                       {driver.name}
                     </option>
@@ -683,44 +699,48 @@ export default function CreateActivityPage() {
                 )}
               </div>
             )}
-            {user?.role !== "admin" && (
-              <input type="hidden" name="id_driver" value={user?.id} />
-            )}
-            
+            {user?.role !== "admin" && <input type="hidden" name="id_driver" value={user?.id} />}
+
             {/* Jenis (Reward) - Diubah menjadi textbox */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Jenis</label>
               <input
                 type="text"
                 name="jenis"
-                value={rewards.find(r => r.id === parseInt(formData.id_reward || "0")) ? 
-                       `${rewards.find(r => r.id === parseInt(formData.id_reward || "0"))?.jenis} - ${rewards.find(r => r.id === parseInt(formData.id_reward || "0"))?.tipe}` : ""}
+                value={
+                  rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))
+                    ? `${rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))?.jenis} - ${rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))?.tipe}`
+                    : ""
+                }
                 onChange={handleRewardChange}
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                 list="reward-options"
                 placeholder="Pilih atau ketik jenis reward"
               />
               <datalist id="reward-options">
-                {rewards.map(reward => (
+                {rewards.map((reward) => (
                   <option key={reward.id} value={`${reward.jenis} - ${reward.tipe}`} />
                 ))}
               </datalist>
             </div>
-            
+
             {/* Reward (dalam Rupiah) */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Reward (Rp)</label>
               <input
                 type="text"
                 name="reward_value"
-                value={rewards.find(r => r.id === parseInt(formData.id_reward || "0"))?.reward ? 
-                       `Rp ${rewards.find(r => r.id === parseInt(formData.id_reward || "0"))?.reward?.toLocaleString("id-ID")}` : ""}
+                value={
+                  rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))?.reward
+                    ? `Rp ${rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))?.reward?.toLocaleString("id-ID")}`
+                    : ""
+                }
                 readOnly
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                 placeholder="Pilih jenis reward terlebih dahulu"
               />
             </div>
-            
+
             {/* Asisten Luar Kota */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Asisten Luar Kota</label>
@@ -732,7 +752,7 @@ export default function CreateActivityPage() {
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
             </div>
-            
+
             {/* Area */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Area</label>
@@ -744,7 +764,7 @@ export default function CreateActivityPage() {
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
             </div>
-            
+
             {/* Dari */}
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700">Dari</label>
@@ -759,7 +779,7 @@ export default function CreateActivityPage() {
                 <p className="mt-1 text-sm text-red-600">Field 'Dari' wajib diisi</p>
               )}
             </div>
-            
+
             {/* Tujuan */}
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700">Tujuan</label>
@@ -774,7 +794,7 @@ export default function CreateActivityPage() {
                 <p className="mt-1 text-sm text-red-600">Field 'Tujuan' wajib diisi</p>
               )}
             </div>
-            
+
             {/* KM Awal */}
             <div>
               <label className="block text-sm font-medium text-gray-700">KM Awal</label>
@@ -786,7 +806,7 @@ export default function CreateActivityPage() {
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
             </div>
-            
+
             {/* KM Akhir */}
             <div>
               <label className="block text-sm font-medium text-gray-700">KM Akhir</label>
@@ -820,7 +840,7 @@ export default function CreateActivityPage() {
                 />
               )}
             </div>
-            
+
             {/* Biaya yang Dibayar */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Biaya yang Dibayar</label>
@@ -844,7 +864,7 @@ export default function CreateActivityPage() {
                 searchKeys={["nama_pemesan", "hp"]}
               />
             </div>
-            
+
             {/* Detail Pemesan (Read-only) */}
             {selectedPemesan && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -880,7 +900,7 @@ export default function CreateActivityPage() {
                 searchKeys={["nama_pm"]}
               />
             </div>
-            
+
             {/* Detail PM (Read-only) */}
             {selectedPM && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -915,7 +935,11 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Usia</label>
                   <input
                     type="text"
-                    value={selectedPM.usia_pm !== undefined && selectedPM.usia_pm !== null ? selectedPM.usia_pm.toString() : "Tidak ada data"}
+                    value={
+                      selectedPM.usia_pm !== undefined && selectedPM.usia_pm !== null
+                        ? selectedPM.usia_pm.toString()
+                        : "Tidak ada data"
+                    }
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -976,7 +1000,7 @@ export default function CreateActivityPage() {
                 </div>
               </div>
             )}
-            
+
             {/* Kegiatan */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Kegiatan</label>
@@ -988,7 +1012,7 @@ export default function CreateActivityPage() {
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
             </div>
-            
+
             {/* Rumpun Program */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Rumpun Program</label>
@@ -1000,7 +1024,7 @@ export default function CreateActivityPage() {
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
             </div>
-            
+
             {/* Infaq */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Infaq</label>
@@ -1012,87 +1036,17 @@ export default function CreateActivityPage() {
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
             </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Dokumentasi Aktivitas</label>
+              <FileUpload
+                onFilesChange={setDocumentationFiles}
+                maxFiles={5}
+                acceptedTypes={["image/*", ".pdf", ".doc", ".docx"]}
+              />
+            </div>
           </div>
           
-          {/* Documentation Upload */}
-          <div className="sm:col-span-2 mt-6">
-            <label className="block text-sm font-medium text-gray-700">Dokumentasi</label>
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-              <div className="space-y-1 text-center">
-                <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
-                  stroke="currentColor"
-                  fill="none"
-                  viewBox="0 0 48 48"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <div className="flex text-sm text-gray-600">
-                  <label
-                    htmlFor="documentation-upload"
-                    className="relative cursor-pointer bg-white rounded-md font-medium text-green-600 hover:text-green-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-green-500"
-                  >
-                    <span>Upload a file</span>
-                    <input
-                      id="documentation-upload"
-                      name="documentation-upload"
-                      type="file"
-                      className="sr-only"
-                      multiple
-                      accept="image/*"
-                      onChange={handleDocumentationFileChange}
-                    />
-                  </label>
-                  <p className="pl-1">or drag and drop</p>
-                </div>
-                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-              </div>
-            </div>
-            
-            {/* Display selected files */}
-            {documentationFiles.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium text-gray-700">File yang dipilih:</h4>
-                <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                  {documentationFiles.map((file, index) => (
-                    <li key={index} className="flex items-center justify-between py-3 pl-3 pr-4 text-sm">
-                      <div className="flex w-0 flex-1 items-center">
-                        <svg
-                          className="h-5 w-5 flex-shrink-0 text-gray-400"
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <span className="ml-2 w-0 flex-1 truncate">{file.name}</span>
-                      </div>
-                      <div className="ml-4 flex-shrink-0">
-                        <button
-                          type="button"
-                          className="font-medium text-red-600 hover:text-red-500"
-                          onClick={() => removeDocumentationFile(index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
           
           <div className="flex justify-end space-x-3 mt-6">
             <Button
@@ -1108,12 +1062,8 @@ export default function CreateActivityPage() {
             >
               Batal
             </Button>
-            <Button
-              type="submit"
-              className="bg-green-600 hover:bg-green-700"
-              disabled={loadingData}
-            >
-              {loadingData ? "Menyimpan..." : "Simpan"}
+            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loadingData || uploadingFiles}>
+              {loadingData ? "Menyimpan..." : uploadingFiles ? "Mengupload..." : "Simpan"}
             </Button>
           </div>
         </form>
@@ -1121,7 +1071,10 @@ export default function CreateActivityPage() {
 
       {/* Create Pemesan Modal */}
       {showCreatePemesan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50" style={{ zIndex: 9999 }}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
+          style={{ zIndex: 9999 }}
+        >
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md border-4 border-red-500">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
@@ -1141,7 +1094,7 @@ export default function CreateActivityPage() {
                     <input
                       type="text"
                       value={newPemesan.nama_pemesan}
-                      onChange={(e) => setNewPemesan({...newPemesan, nama_pemesan: e.target.value})}
+                      onChange={(e) => setNewPemesan({ ...newPemesan, nama_pemesan: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                       required
                     />
@@ -1151,7 +1104,7 @@ export default function CreateActivityPage() {
                     <input
                       type="text"
                       value={newPemesan.hp}
-                      onChange={(e) => setNewPemesan({...newPemesan, hp: e.target.value})}
+                      onChange={(e) => setNewPemesan({ ...newPemesan, hp: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                       required
                     />
@@ -1180,7 +1133,10 @@ export default function CreateActivityPage() {
 
       {/* Create PM Modal */}
       {showCreatePM && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50" style={{ zIndex: 9999 }}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
+          style={{ zIndex: 9999 }}
+        >
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border-4 border-blue-500">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
@@ -1200,7 +1156,7 @@ export default function CreateActivityPage() {
                     <input
                       type="text"
                       value={newPM.nama_pm}
-                      onChange={(e) => setNewPM({...newPM, nama_pm: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, nama_pm: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                       required
                     />
@@ -1209,7 +1165,7 @@ export default function CreateActivityPage() {
                     <label className="block text-sm font-medium text-gray-700">Alamat</label>
                     <textarea
                       value={newPM.alamat_pm}
-                      onChange={(e) => setNewPM({...newPM, alamat_pm: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, alamat_pm: e.target.value })}
                       rows={3}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     />
@@ -1218,7 +1174,7 @@ export default function CreateActivityPage() {
                     <label className="block text-sm font-medium text-gray-700">Jenis Kelamin</label>
                     <select
                       value={newPM.jenis_kelamin_pm}
-                      onChange={(e) => setNewPM({...newPM, jenis_kelamin_pm: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, jenis_kelamin_pm: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     >
                       <option value="">Pilih Jenis Kelamin</option>
@@ -1231,7 +1187,7 @@ export default function CreateActivityPage() {
                     <input
                       type="number"
                       value={newPM.usia_pm}
-                      onChange={(e) => setNewPM({...newPM, usia_pm: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, usia_pm: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     />
                   </div>
@@ -1239,11 +1195,11 @@ export default function CreateActivityPage() {
                     <label className="block text-sm font-medium text-gray-700">Asnaf</label>
                     <select
                       value={newPM.id_asnaf}
-                      onChange={(e) => setNewPM({...newPM, id_asnaf: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, id_asnaf: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     >
                       <option value="">Pilih Asnaf</option>
-                      {asnafs.map(asnaf => (
+                      {asnafs.map((asnaf) => (
                         <option key={asnaf.id} value={asnaf.id}>
                           {asnaf.asnaf}
                         </option>
@@ -1255,7 +1211,7 @@ export default function CreateActivityPage() {
                     <input
                       type="text"
                       value={newPM.nik}
-                      onChange={(e) => setNewPM({...newPM, nik: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, nik: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     />
                   </div>
@@ -1264,7 +1220,7 @@ export default function CreateActivityPage() {
                     <input
                       type="text"
                       value={newPM.no_kk}
-                      onChange={(e) => setNewPM({...newPM, no_kk: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, no_kk: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     />
                   </div>
@@ -1273,7 +1229,7 @@ export default function CreateActivityPage() {
                     <input
                       type="text"
                       value={newPM.tempat_lahir}
-                      onChange={(e) => setNewPM({...newPM, tempat_lahir: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, tempat_lahir: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     />
                   </div>
@@ -1282,7 +1238,7 @@ export default function CreateActivityPage() {
                     <input
                       type="date"
                       value={newPM.tgl_lahir}
-                      onChange={(e) => setNewPM({...newPM, tgl_lahir: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, tgl_lahir: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     />
                   </div>
@@ -1290,7 +1246,7 @@ export default function CreateActivityPage() {
                     <label className="block text-sm font-medium text-gray-700">Status Marital</label>
                     <select
                       value={newPM.status_marital}
-                      onChange={(e) => setNewPM({...newPM, status_marital: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, status_marital: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     >
                       <option value="">Pilih Status</option>
@@ -1304,7 +1260,7 @@ export default function CreateActivityPage() {
                     <input
                       type="text"
                       value={newPM.agama}
-                      onChange={(e) => setNewPM({...newPM, agama: e.target.value})}
+                      onChange={(e) => setNewPM({ ...newPM, agama: e.target.value })}
                       className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                     />
                   </div>
@@ -1329,7 +1285,6 @@ export default function CreateActivityPage() {
           </div>
         </div>
       )}
-
     </DashboardLayout>
   )
 }

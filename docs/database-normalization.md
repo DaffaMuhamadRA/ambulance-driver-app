@@ -20,18 +20,18 @@ This approach led to:
 
 #### pemesan Table
 Stores unique customer information:
-```sql
+\`\`\`sql
 CREATE TABLE pemesan (
   id SERIAL PRIMARY KEY,
   nama_pemesan VARCHAR(255) NOT NULL,
   hp VARCHAR(20) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW()
 );
-```
+\`\`\`
 
 #### penerima_manfaat Table
 Stores detailed beneficiary information:
-```sql
+\`\`\`sql
 CREATE TABLE penerima_manfaat (
   id SERIAL PRIMARY KEY,
   nama_pm VARCHAR(255) NOT NULL,
@@ -47,20 +47,20 @@ CREATE TABLE penerima_manfaat (
   agama VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW()
 );
-```
+\`\`\`
 
 ### 2. Updated ambulan_activity Table
 Added foreign key references:
-```sql
+\`\`\`sql
 ALTER TABLE ambulan_activity 
 ADD COLUMN id_pemesan INTEGER REFERENCES pemesan(id),
 ADD COLUMN id_penerima_manfaat INTEGER REFERENCES penerima_manfaat(id);
-```
+\`\`\`
 
 ### 3. Data Migration Process
 
 #### Phase 1: Extract Unique Records
-```sql
+\`\`\`sql
 -- Extract unique customers
 INSERT INTO pemesan (nama_pemesan, hp)
 SELECT DISTINCT nama_pemesan, hp 
@@ -86,10 +86,10 @@ SELECT DISTINCT
   status_marital, agama
 FROM ambulan_activity 
 WHERE nama_pm IS NOT NULL;
-```
+\`\`\`
 
 #### Phase 2: Establish Relationships
-```sql
+\`\`\`sql
 -- Link activities to pemesan records
 UPDATE ambulan_activity aa
 SET id_pemesan = p.id
@@ -109,13 +109,13 @@ AND (aa.nik = pm.nik OR (aa.nik IS NULL AND pm.nik IS NULL))
 AND (aa.no_kk = pm.no_kk OR (aa.no_kk IS NULL AND pm.no_kk IS NULL))
 AND (aa.tempat_lahir = pm.tempat_lahir OR (aa.tempat_lahir IS NULL AND pm.tempat_lahir IS NULL))
 AND aa.id_penerima_manfaat IS NULL;
-```
+\`\`\`
 
 ### 4. Updated Application Code
 
 #### Activities Service (lib/activities.ts)
 Modified all query functions to use JOINs with the new tables:
-```typescript
+\`\`\`typescript
 // Example query structure
 SELECT 
   a.id, a.tgl as tgl_berangkat, a.tgl_pulang, /* ... other fields ... */,
@@ -127,7 +127,7 @@ FROM ambulan_activity a
 LEFT JOIN pemesan p ON a.id_pemesan = p.id
 LEFT JOIN penerima_manfaat pm ON a.id_penerima_manfaat = pm.id
 /* ... other JOINs ... */
-```
+\`\`\`
 
 The COALESCE function ensures backward compatibility by falling back to the original columns if the foreign key relationships are not established.
 

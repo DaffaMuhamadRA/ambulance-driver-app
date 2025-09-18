@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation"
 import { cookies } from "next/headers"
-import { BASE_URL } from "@/lib/config"
 import { getActivityById } from "@/lib/activities"
 import { sql } from "@/lib/db"
 import DashboardLayout from "@/components/dashboard-layout"
+import DocumentationGallery from "@/components/documentation-gallery"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import DocumentationImage from "@/components/documentation-image"
@@ -82,9 +82,9 @@ async function getCurrentUser(): Promise<User | null> {
 
     // Import the getSession function to ensure consistency
     const { getSession } = await import("@/app/api/auth/session/route")
-    
+
     const session = await getSession(sessionToken)
-    
+
     if (!session) {
       return null
     }
@@ -222,13 +222,13 @@ async function getActivityByIdWithDocumentation(id: number): Promise<Activity | 
 
 export default async function ActivityDetailPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser()
-  
+
   if (!user) {
     redirect("/login")
   }
-  
-  const activityId = parseInt(params.id)
-  
+
+  const activityId = Number.parseInt(params.id)
+
   if (isNaN(activityId)) {
     notFound()
   }
@@ -238,7 +238,7 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
   if (!activity) {
     notFound()
   }
-  
+
   // For drivers, check if the activity belongs to them
   // For admins, allow access to all activities
   if (user.role === "driver") {
@@ -249,7 +249,7 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
       notFound()
     }
   }
-  
+
   const formatDate = (dateString: string) => {
     if (!dateString) return "-"
     return new Date(dateString).toLocaleDateString("id-ID", {
@@ -294,7 +294,7 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-800">Informasi Aktivitas</h2>
@@ -350,178 +350,180 @@ export default async function ActivityDetailPage({ params }: { params: { id: str
                   {activity.tgl_berangkat ? formatDate(activity.tgl_berangkat) : "-"}
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Tanggal Pulang</h3>
                 <p className="mt-1 text-sm text-gray-900">
                   {activity.tgl_pulang ? formatDate(activity.tgl_pulang) : "-"}
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Ambulan (No Plat)</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.ambulance.nopol || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Detail</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.detail || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Jam Berangkat</h3>
                 <p className="mt-1 text-sm text-gray-900">
                   {activity.jam_berangkat ? formatTime(activity.jam_berangkat) : "-"}
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Jam Pulang</h3>
                 <p className="mt-1 text-sm text-gray-900">
                   {activity.jam_pulang ? formatTime(activity.jam_pulang) : "-"}
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Jenis</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.tipe || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Asisten Luar Kota</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.asisten_luar_kota || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Area</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.area || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Dari</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.dari || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Tujuan</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.tujuan || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Driver</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.user.name || "-"}</p>
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Nama Pemesan</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.nama_pemesan || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">HP</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.hp || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Nama PM</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.nama_pm || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Alamat PM</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.alamat_pm || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Jenis Kelamin PM</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.jenis_kelamin_pm || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Usia PM</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.usia_pm || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Asnaf</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.id_asnaf || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">NIK</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.nik || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">No KK</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.no_kk || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Tempat Lahir</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.tempat_lahir || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Tanggal Lahir</h3>
                 <p className="mt-1 text-sm text-gray-900">
                   {activity.tgl_lahir ? formatDate(activity.tgl_lahir) : "-"}
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Status Marital</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.status_marital || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Kegiatan</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.kegiatan || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Rumpun Program</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.rumpun_program || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">KM Awal</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.km_awal || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">KM Akhir</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.km_akhir || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Biaya Antar</h3>
                 <p className="mt-1 text-sm text-gray-900">
                   {activity.reward > 0 ? `Rp ${activity.reward.toLocaleString("id-ID")}` : "-"}
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Infaq Dibayar</h3>
                 <p className="mt-1 text-sm text-gray-900">
-                  {(activity.biaya_dibayar || 0) > 0 ? `Rp ${(activity.biaya_dibayar || 0).toLocaleString("id-ID")}` : "-"}
+                  {(activity.biaya_dibayar || 0) > 0
+                    ? `Rp ${(activity.biaya_dibayar || 0).toLocaleString("id-ID")}`
+                    : "-"}
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Infaq</h3>
                 <p className="mt-1 text-sm text-gray-900">
                   {(activity.infaq || 0) > 0 ? `Rp ${(activity.infaq || 0).toLocaleString("id-ID")}` : "-"}
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Diagnosa Sakit</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.diagnosa_sakit || "-"}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Agama</h3>
                 <p className="mt-1 text-sm text-gray-900">{activity.agama || "-"}</p>
