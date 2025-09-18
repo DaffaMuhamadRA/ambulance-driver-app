@@ -93,7 +93,7 @@ export default function CreateActivityPage() {
     id_detail: "",
     jam_berangkat: "",
     jam_pulang: "",
-    id_driver: user?.role === "admin" ? "" : user?.id.toString() || "",
+    id_driver: "",
     asisten_luar_kota: "",
     area: "Dalam Kota",
     dari: "",
@@ -158,6 +158,13 @@ export default function CreateActivityPage() {
   useEffect(() => {
     if (user) {
       fetchReferenceData()
+      // Set the driver ID in the form when user is loaded
+      if (user.role !== "admin") {
+        setFormData(prev => ({
+          ...prev,
+          id_driver: user.id_driver?.toString() || user.id.toString()
+        }))
+      }
     }
   }, [user])
 
@@ -389,7 +396,7 @@ export default function CreateActivityPage() {
       
       // For non-admin users, use the id_driver from cms_users table
       // For admin users, use the selected driver from the form
-      const driverId: string | null = user?.role === "admin" ? formData.id_driver : user?.id_driver?.toString() || null
+      const driverId: string | null = user?.role === "admin" ? formData.id_driver : (user?.id_driver?.toString() || user?.id?.toString() || null)
 
       // Prepare data to send with proper type conversions
       const dataToSend = {
@@ -453,7 +460,13 @@ export default function CreateActivityPage() {
       }
 
       const result = await response.json()
-      const activityId = result.activity.id
+      
+      // Check if the result contains the expected id
+      if (!result || !result.id) {
+        throw new Error("Invalid response from server: " + JSON.stringify(result))
+      }
+      
+      const activityId = result.id
 
       if (documentationFiles.length > 0) {
         setUploadingFiles(true)
@@ -471,18 +484,23 @@ export default function CreateActivityPage() {
 
         if (uploadResponse.ok) {
           const uploadResult = await uploadResponse.json()
-
-          // Save documentation records to database
-          await fetch("/api/activities/dokumentasi", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              activityId: activityId,
-              files: uploadResult.files,
-            }),
-          })
+          
+          // Check if uploadResult has the expected files property
+          if (uploadResult && uploadResult.files) {
+            // Save documentation records to database
+            await fetch("/api/activities/dokumentasi", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                activityId: activityId,
+                files: uploadResult.files,
+              }),
+            })
+          } else {
+            console.warn("Upload result does not contain expected files property:", uploadResult)
+          }
         }
 
         setUploadingFiles(false)
@@ -699,7 +717,7 @@ export default function CreateActivityPage() {
                 )}
               </div>
             )}
-            {user?.role !== "admin" && <input type="hidden" name="id_driver" value={user?.id} />}
+            {user?.role !== "admin" && user && <input type="hidden" name="id_driver" value={user.id} />}
 
             {/* Jenis (Reward) - Diubah menjadi textbox */}
             <div>
