@@ -148,7 +148,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew }
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
         {currentActivities.map((activity) => {
           const styles = getDetailStyles(activity.detail)
           const isSelected = selectedIds.has(activity.id)
@@ -158,45 +158,62 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew }
               key={activity.id}
               className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col transition-all hover:shadow-md hover:-translate-y-px"
             >
-              <div className="p-4 flex-grow flex flex-col">
-                <div className="flex justify-between items-start mb-3">
-                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${styles.badge}`}>{activity.detail}</span>
+              <div className="p-3 flex-grow flex flex-col">
+                <div className="flex justify-between items-start mb-2">
+                  <span className={`px-2 py-1 text-xs font-bold rounded-full ${styles.badge}`}>{activity.detail}</span>
                   <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={(e) => handleCheckboxChange(activity.id, e.target.checked)}
-                    className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                   />
                 </div>
-                <div className="mb-4">
-                  <p className="text-gray-500 text-sm">{formatDate(activity.tgl_berangkat)}</p>
-                  <p className="font-bold text-gray-800 text-lg">{activity.ambulance.nopol}</p>
-                  {isAdmin && <p className="text-sm text-gray-600">Driver: {activity.user.name}</p>}
+                <div className="mb-3">
+                  <p className="text-gray-500 text-xs">{formatDate(activity.tgl_berangkat)}</p>
+                  <p className="font-bold text-gray-800 text-sm">{activity.ambulance.nopol}</p>
                 </div>
-                <div className="text-sm text-gray-700 space-y-3 flex-grow">
-                  <p>
-                    <strong className="font-medium text-gray-900 block">Dari:</strong> {activity.dari}
-                  </p>
-                  <p>
-                    <strong className="font-medium text-gray-900 block">Tujuan:</strong> {activity.tujuan}
-                  </p>
+                {/* Simplified mobile view with just 2 rows of key information */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <strong className="font-medium text-gray-900 block">Waktu:</strong>
-                    {formatTime(activity.jam_berangkat)} — {formatTime(activity.jam_pulang)}
+                    <p className="font-medium text-gray-900">Dari:</p>
+                    <p className="text-gray-700 truncate">{activity.dari}</p>
                   </div>
-                  {activity.reward > 0 && (
-                    <p>
-                      <strong className="font-medium text-gray-900 block">Reward:</strong> Rp{" "}
-                      {activity.reward.toLocaleString("id-ID")}
-                    </p>
-                  )}
+                  <div>
+                    <p className="font-medium text-gray-900">Tujuan:</p>
+                    <p className="text-gray-700 truncate">{activity.tujuan}</p>
+                  </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 flex items-center justify-end space-x-2 rounded-b-lg border-t border-gray-200">
-                <Link href={`/activities/${activity.id}`}>
+              <div className="bg-gray-50 px-3 py-2 flex items-center justify-between rounded-b-lg border-t border-gray-200">
+                <div className="text-xs text-gray-600">
+                  {formatTime(activity.jam_berangkat)} - {formatTime(activity.jam_pulang)}
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Link href={`/activities/${activity.id}`}>
+                    <button
+                      className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
+                      title="Lihat Detail"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                  </Link>
                   <button
-                    className="p-2 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
-                    title="Lihat Detail"
+                    className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
+                    title="Edit"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -210,54 +227,34 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew }
                       strokeLinejoin="round"
                       className="h-4 w-4"
                     >
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                      <circle cx="12" cy="12" r="3" />
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                      <path d="m15 5 4 4" />
                     </svg>
                   </button>
-                </Link>
-                <button
-                  className="p-2 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
-                  title="Edit"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
+                  <button
+                    className="p-1.5 rounded-md text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
+                    title="Hapus"
                   >
-                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                    <path d="m15 5 4 4" />
-                  </svg>
-                </button>
-                <button
-                  className="p-2 rounded-md text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
-                  title="Hapus"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
-                  >
-                    <path d="M3 6h18" />
-                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                    <line x1="10" x2="10" y1="11" y2="17" />
-                    <line x1="14" x2="14" y1="11" y2="17" />
-                  </svg>
-                </button>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      <line x1="10" x2="10" y1="11" y2="17" />
+                      <line x1="14" x2="14" y1="11" y2="17" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           )
