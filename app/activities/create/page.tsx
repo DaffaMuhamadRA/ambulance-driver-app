@@ -877,7 +877,8 @@ export default function CreateActivityPage() {
               <LiveSearchInput
                 items={pemesans}
                 onSelect={handlePemesanSelect}
-                placeholder="Cari atau ketik nama pemesan"
+                onAutoFill={handlePemesanSelect} // Add auto-fill functionality
+                placeholder="Cari atau ketik nama pemesan/no HP"
                 displayKey="nama_pemesan"
                 searchKeys={["nama_pemesan", "hp"]}
                 onCreate={() => setShowCreatePemesan(true)}
@@ -914,6 +915,7 @@ export default function CreateActivityPage() {
               <LiveSearchInput
                 items={penerimaManfaats}
                 onSelect={handlePMSelect}
+                onAutoFill={handlePMSelect} // Add auto-fill functionality
                 placeholder="Cari atau ketik nama PM"
                 displayKey="nama_pm"
                 searchKeys={["nama_pm"]}

@@ -10,7 +10,13 @@ interface LiveSearchInputProps {
   searchKeys: string[]
   onCreate?: () => void
   createButtonText?: string
-  initialValue?: string // Add this prop for initial value
+  initialValue?: string
+  initialItemId?: number
+  name?: string // Untuk atribut name pada input hidden
+  // New props for auto-fill functionality
+  onAutoFill?: (item: any) => void
+  // New prop to allow clearing the field
+  allowClear?: boolean
 }
 
 export default function LiveSearchInput({
@@ -21,17 +27,49 @@ export default function LiveSearchInput({
   searchKeys,
   onCreate,
   createButtonText = "Create New",
-  initialValue = "" // Add default value
+  initialValue = "",
+  initialItemId,
+  name,
+  onAutoFill, // New prop for auto-fill functionality
+  allowClear = false // New prop to allow clearing the field
 }: LiveSearchInputProps) {
-  const [searchTerm, setSearchTerm] = useState(initialValue) // Use initialValue as initial state
-
-  // Update search term when initialValue changes
-  useEffect(() => {
-    setSearchTerm(initialValue);
-  }, [initialValue])
+  const [searchTerm, setSearchTerm] = useState("")
   const [filteredItems, setFilteredItems] = useState<any[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Initialize the component only once when items are available
+  useEffect(() => {
+    if (!isInitialized && items.length > 0) {
+      if (initialItemId !== undefined) {
+        // Find item by ID first
+        const item = items.find(item => item.id === initialItemId);
+        if (item) {
+          setSearchTerm(item[displayKey]);
+          setSelectedItemId(item.id);
+          setIsInitialized(true);
+          return;
+        }
+      }
+      
+      // If we can't find by ID but have an initial value, try to find by value
+      if (initialValue) {
+        setSearchTerm(initialValue);
+        // Try to find matching item by name for ID
+        const matchingItem = items.find(item => 
+          searchKeys.some(key => 
+            item[key] && item[key].toString().toLowerCase() === initialValue.toLowerCase()
+          )
+        );
+        if (matchingItem) {
+          setSelectedItemId(matchingItem.id);
+        }
+      }
+      setIsInitialized(true);
+    }
+  }, [isInitialized, items, initialItemId, displayKey, searchKeys, initialValue])
 
   // Filter items based on search term
   useEffect(() => {
@@ -43,11 +81,17 @@ export default function LiveSearchInput({
       )
       setFilteredItems(filtered)
       setShowDropdown(true)
+      
+      // Auto-fill functionality: if there's exactly one match, auto-fill the form
+      if (filtered.length === 1 && onAutoFill) {
+        onAutoFill(filtered[0]);
+      }
     } else {
       setFilteredItems([])
+      // Only show dropdown when user is actively searching, not based on initial value
       setShowDropdown(false)
     }
-  }, [searchTerm, items, searchKeys])
+  }, [searchTerm, items, searchKeys, onAutoFill])
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -64,30 +108,87 @@ export default function LiveSearchInput({
   }, [])
 
   const handleSelect = (item: any) => {
-    setSearchTerm(item[displayKey])
-    onSelect(item)
-    setShowDropdown(false)
+    setSearchTerm(item[displayKey]);
+    setSelectedItemId(item.id);
+    onSelect(item);
+    setShowDropdown(false);
+  }
+
+  // Function to clear the search field
+  const handleClear = () => {
+    setSearchTerm('');
+    setSelectedItemId(null);
+    // Call onSelect with null to clear the selection in the parent component
+    onSelect(null);
+    setShowDropdown(false);
+  }
+
+  // Function to handle manual changes to the search term
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    // If the user clears the field manually, also clear the selection
+    if (value === '') {
+      setSelectedItemId(null);
+      onSelect(null);
+    }
+  }
+
+  // Function to format item display text
+  const formatItemDisplay = (item: any) => {
+    // Special handling for pemesan items to show "nama_pemesan (hp)" format
+    if (displayKey === "nama_pemesan" && item.hp) {
+      return `${item[displayKey]} (${item.hp})`;
+    }
+    // For other items or when hp is not available, just show the displayKey value
+    return item[displayKey];
   }
 
   const handleCreate = () => {
     if (onCreate) {
-      onCreate()
+      onCreate();
     }
-    setShowDropdown(false)
+    setShowDropdown(false);
   }
 
   return (
     <div className="relative" ref={dropdownRef}>
+      {/* Input hidden untuk menyimpan ID */}
+      <input 
+        type="hidden" 
+        name={name} 
+        value={selectedItemId || ''} 
+      />
+      
       <div className="flex space-x-2">
         <div className="relative flex-grow">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onFocus={() => searchTerm && setShowDropdown(true)}
-            className="block w-full px-3 py-2 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-            placeholder={placeholder}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onFocus={() => {
+                // Show dropdown when there's a search term or when we have items to show
+                if (searchTerm || items.length > 0) {
+                  setShowDropdown(true);
+                }
+              }}
+              className="block w-full px-3 py-2 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm pr-10"
+              placeholder={placeholder}
+            />
+            {allowClear && (searchTerm || selectedItemId) && (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+          </div>
           {showDropdown && (
             <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
               {filteredItems.length > 0 ? (
@@ -97,7 +198,7 @@ export default function LiveSearchInput({
                     className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                     onClick={() => handleSelect(item)}
                   >
-                    {item[displayKey]}
+                    {formatItemDisplay(item)}
                   </div>
                 ))
               ) : searchTerm ? (
@@ -111,10 +212,10 @@ export default function LiveSearchInput({
               )}
               {onCreate && (
                 <div 
-                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-t border-gray-200 text-green-600 font-medium"
+                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-t border-gray-200 text-blue-600 font-medium"
                   onClick={handleCreate}
                 >
-                  {createButtonText}
+                  + Tambah data baru
                 </div>
               )}
             </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -62,35 +62,49 @@ interface Reward {
 }
 
 interface Activity {
-  id: number
-  tgl: string
-  tgl_pulang: string
-  id_ambulan: number
-  id_detail: number
-  jam_berangkat: string
-  jam_pulang: string
-  id_driver: number
-  asisten_luar_kota: string
-  area: string
-  dari: string
-  tujuan: string
-  km_awal: number
-  km_akhir: number
-  biaya_antar: number
-  biaya_dibayar: number
-  id_pemesan: number
-  id_penerima_manfaat: number
-  infaq: number
-  id_reward: number
-  kegiatan: string
-  rumpun_program: string
-  id_kantor?: number
+  id: number;
+  tgl: string;
+  tgl_pulang: string;
+  id_ambulan: number;
+  id_detail: number;
+  jam_berangkat: string;
+  jam_pulang: string;
+  id_driver: number;
+  asisten_luar_kota: string;
+  area: string;
+  dari: string;
+  tujuan: string;
+  km_awal: number;
+  km_akhir: number;
+  biaya_antar: number;
+  biaya_dibayar: number;
+  id_pemesan: number;
+  id_penerima_manfaat: number;
+  infaq: number;
+  id_reward: number;
+  kegiatan: string;
+  rumpun_program: string;
+  id_kantor?: number;
   documentation?: Array<{
-    id: number
-    url: string
-    created_at: string
-  }>
+    id: number;
+    url: string;
+    created_at: string;
+  }>;
+  nama_pemesan: string;
+  hp: string;
+  nama_pm: string;
+  alamat_pm: string | null;
+  jenis_kelamin_pm: string | null;
+  usia_pm: number | null;
+  nik: string | null;
+  no_kk: string | null;
+  tempat_lahir: string | null;
+  tgl_lahir: string | null;
+  status_marital: string | null;
+  agama: string | null;
+  id_asnaf: number | null;
 }
+
 
 interface ActivityDetail extends Activity {
   tgl_berangkat: string
@@ -109,7 +123,7 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   const [rewards, setRewards] = useState<Reward[]>([])
   const [showCreatePemesan, setShowCreatePemesan] = useState(false)
   const [showCreatePM, setShowCreatePM] = useState(false)
-  const [loadingData, setLoadingData] = useState(false)
+  const [loadingData, setLoadingData] = useState(true) // Set true di awal
   const [error, setError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
 
@@ -183,117 +197,99 @@ export default function EditActivityPage({ params }: { params: { id: string } })
     }
   }, [user, loading, router])
 
-  // Fetch activity data for editing
+
+  // Fetch all data in one go
   useEffect(() => {
-    if (user && !isNaN(activityId)) {
-      fetchActivityData()
-    }
-  }, [user, activityId])
+    async function fetchData() {
+      if (!user || isNaN(activityId)) return;
 
-  // Fetch reference data
-  useEffect(() => {
-    if (user) {
-      fetchReferenceData()
-    }
-  }, [user])
+      try {
+        setLoadingData(true);
 
-  const fetchActivityData = async () => {
-    try {
-      setLoadingData(true)
-      const response = await fetch(`/api/activities/${activityId}`)
-      
-      if (!response.ok) {
-        throw new Error("Gagal memuat data aktivitas")
+        const [
+          activityRes,
+          kantorRes,
+          ambulanRes,
+          detailRes,
+          driverRes,
+          pemesanRes,
+          pmRes,
+          asnafRes,
+          rewardRes
+        ] = await Promise.all([
+          fetch(`/api/activities/${activityId}`),
+          fetch("/api/reference/kantors"),
+          fetch("/api/reference/ambulans"),
+          fetch("/api/reference/details"),
+          fetch("/api/reference/drivers"),
+          fetch("/api/reference/pemesans"),
+          fetch("/api/reference/penerima-manfaats"),
+          fetch("/api/reference/asnafs"),
+          fetch("/api/reference/rewards")
+        ]);
+
+        if (!activityRes.ok) throw new Error("Gagal memuat data aktivitas");
+        
+        const activity: ActivityDetail = await activityRes.json();
+        setActivityData(activity);
+
+        // Set form data with activity values
+        setFormData({
+            id_kantor: activity.id_kantor?.toString() || (isDriver ? "1" : ""),
+            tgl: activity.tgl_berangkat || "",
+            tgl_pulang: activity.tgl_pulang || "",
+            id_ambulan: activity.id_ambulan?.toString() || "",
+            id_detail: activity.id_detail?.toString() || "",
+            jam_berangkat: activity.jam_berangkat || "",
+            jam_pulang: activity.jam_pulang || "",
+            id_driver: activity.id_driver?.toString() || (user?.role === "admin" ? "" : user?.id.toString() || ""),
+            asisten_luar_kota: activity.asisten_luar_kota || "",
+            area: activity.area || "Dalam Kota",
+            dari: activity.dari || "",
+            tujuan: activity.tujuan || "",
+            km_awal: activity.km_awal?.toString() || "",
+            km_akhir: activity.km_akhir?.toString() || "",
+            biaya_antar: activity.biaya_antar?.toString() || "0",
+            biaya_dibayar: activity.biaya_dibayar?.toString() || "0",
+            id_pemesan: activity.id_pemesan?.toString() || "",
+            id_penerima_manfaat: activity.id_penerima_manfaat?.toString() || "",
+            infaq: activity.infaq?.toString() || "0",
+            id_reward: activity.id_reward?.toString() || "",
+            kegiatan: activity.kegiatan || "pengantaran",
+            rumpun_program: activity.rumpun_program || "kesehatan",
+        });
+
+        if (activity.documentation) {
+          setExistingDocumentation(activity.documentation);
+        }
+
+        // Set reference data
+        if (kantorRes.ok) setKantors(await kantorRes.json());
+        if (ambulanRes.ok) setAmbulans(await ambulanRes.json());
+        if (detailRes.ok) setDetails(await detailRes.json());
+        if (driverRes.ok) setDrivers(await driverRes.json());
+        if (pemesanRes.ok) {
+          const pemesansData = await pemesanRes.json();
+          setPemesans(pemesansData);
+        }
+        if (pmRes.ok) {
+          const pmsData = await pmRes.json();
+          setPenerimaManfaats(pmsData);
+        }
+        if (asnafRes.ok) setAsnafs(await asnafRes.json());
+        if (rewardRes.ok) setRewards(await rewardRes.json());
+
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat data");
+        console.error(err);
+      } finally {
+        setLoadingData(false);
       }
-      
-      const activity: ActivityDetail = await response.json()
-      
-      // Store activity data temporarily
-      setActivityData(activity)
-      
-      // Set form data with activity values
-      setFormData({
-        id_kantor: activity.id_kantor?.toString() || (isDriver ? "1" : ""),
-        tgl: activity.tgl_berangkat || "",
-        tgl_pulang: activity.tgl_pulang || "",
-        id_ambulan: activity.id_ambulan?.toString() || "",
-        id_detail: activity.id_detail?.toString() || "",
-        jam_berangkat: activity.jam_berangkat || "",
-        jam_pulang: activity.jam_pulang || "",
-        id_driver: activity.id_driver?.toString() || (user?.role === "admin" ? "" : user?.id.toString() || ""),
-        asisten_luar_kota: activity.asisten_luar_kota || "",
-        area: activity.area || "Dalam Kota",
-        dari: activity.dari || "",
-        tujuan: activity.tujuan || "",
-        km_awal: activity.km_awal?.toString() || "",
-        km_akhir: activity.km_akhir?.toString() || "",
-        biaya_antar: activity.biaya_antar?.toString() || "0",
-        biaya_dibayar: activity.biaya_dibayar?.toString() || "0",
-        id_pemesan: activity.id_pemesan?.toString() || "",
-        id_penerima_manfaat: activity.id_penerima_manfaat?.toString() || "",
-        infaq: activity.infaq?.toString() || "0",
-        id_reward: activity.id_reward?.toString() || "",
-        kegiatan: activity.kegiatan || "pengantaran",
-        rumpun_program: activity.rumpun_program || "kesehatan",
-      })
-      
-      // Set existing documentation
-      if (activity.documentation) {
-        setExistingDocumentation(activity.documentation)
-      }
-      
-      // Store activity data for later use
-      // We'll set the selected pemesan and PM after reference data is loaded
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memuat data aktivitas")
-      console.error(err)
-    } finally {
-      setLoadingData(false)
     }
-  }
 
-  const fetchReferenceData = async () => {
-    try {
-      setLoadingData(true)
-      
-      // Fetch all reference data in parallel
-      const [
-        kantorRes,
-        ambulanRes,
-        detailRes,
-        driverRes,
-        pemesanRes,
-        pmRes,
-        asnafRes,
-        rewardRes
-      ] = await Promise.all([
-        fetch("/api/reference/kantors"),
-        fetch("/api/reference/ambulans"),
-        fetch("/api/reference/details"),
-        fetch("/api/reference/drivers"),
-        fetch("/api/reference/pemesans"),
-        fetch("/api/reference/penerima-manfaats"),
-        fetch("/api/reference/asnafs"),
-        fetch("/api/reference/rewards")
-      ])
+    fetchData();
+  }, [user, activityId, isDriver]);
 
-      if (kantorRes.ok) setKantors(await kantorRes.json())
-      if (ambulanRes.ok) setAmbulans(await ambulanRes.json())
-      if (detailRes.ok) setDetails(await detailRes.json())
-      if (driverRes.ok) setDrivers(await driverRes.json())
-      if (pemesanRes.ok) setPemesans(await pemesanRes.json())
-      if (pmRes.ok) setPenerimaManfaats(await pmRes.json())
-      if (asnafRes.ok) setAsnafs(await asnafRes.json())
-      if (rewardRes.ok) setRewards(await rewardRes.json())
-      
-      setLoadingData(false)
-    } catch (err) {
-      setError("Gagal memuat data referensi")
-      setLoadingData(false)
-      console.error(err)
-    }
-  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -337,22 +333,6 @@ export default function EditActivityPage({ params }: { params: { id: string } })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.km_awal, formData.km_akhir])
 
-  const handlePemesanSelect = (pemesan: Pemesan) => {
-    setFormData(prev => ({
-      ...prev,
-      id_pemesan: pemesan.id.toString()
-    }))
-    setSelectedPemesan(pemesan)
-  }
-
-  const handlePMSelect = (pm: PenerimaManfaat) => {
-    setFormData(prev => ({
-      ...prev,
-      id_penerima_manfaat: pm.id.toString()
-    }))
-    setSelectedPM(pm)
-  }
-
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     // Temukan reward berdasarkan jenis dan tipe
@@ -383,8 +363,6 @@ export default function EditActivityPage({ params }: { params: { id: string } })
           ...prev,
           id_pemesan: createdPemesan.id.toString()
         }))
-        // Update search field
-        handlePemesanSelect(createdPemesan)
         // Close the create form
         setShowCreatePemesan(false)
         // Reset form
@@ -427,8 +405,6 @@ export default function EditActivityPage({ params }: { params: { id: string } })
           ...prev,
           id_penerima_manfaat: createdPM.id.toString()
         }))
-        // Update search field
-        handlePMSelect(createdPM)
         // Close the create form
         setShowCreatePM(false)
         // Reset form
@@ -455,38 +431,6 @@ export default function EditActivityPage({ params }: { params: { id: string } })
     }
   }
 
-  // Set selected pemesan and PM after both activity data and reference data are loaded
-  useEffect(() => {
-    // Only try to set selected pemesan and PM after both activity data and reference data are loaded
-    if (pemesans.length > 0 && penerimaManfaats.length > 0) {
-      // Get activity data from form state
-      const activityIdPemesan = formData.id_pemesan ? parseInt(formData.id_pemesan) : null;
-      const activityIdPM = formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null;
-      
-      // Set selected pemesan if it exists
-      if (activityIdPemesan) {
-        const pemesan = pemesans.find(p => p.id === activityIdPemesan);
-        if (pemesan) {
-          setSelectedPemesan(pemesan);
-        }
-      } else {
-        // Clear selected pemesan if no ID is set
-        setSelectedPemesan(null);
-      }
-      
-      // Set selected PM if it exists
-      if (activityIdPM) {
-        const pm = penerimaManfaats.find(p => p.id === activityIdPM);
-        if (pm) {
-          setSelectedPM(pm);
-        }
-      } else {
-        // Clear selected PM if no ID is set
-        setSelectedPM(null);
-      }
-    }
-  }, [pemesans, penerimaManfaats, formData.id_pemesan, formData.id_penerima_manfaat])
-
   const handleDocumentationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files)
@@ -501,6 +445,111 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   const removeExistingDocumentation = (id: number) => {
     setExistingDocumentation(prev => prev.filter(doc => doc.id !== id))
   }
+  
+  const handlePemesanSelect = (pemesan: Pemesan | null) => {
+    if (pemesan) {
+      setFormData(prev => ({
+        ...prev,
+        id_pemesan: pemesan.id.toString()
+      }))
+      setSelectedPemesan(pemesan)
+    } else {
+      // Clear the selection
+      setFormData(prev => ({
+        ...prev,
+        id_pemesan: ""
+      }))
+      setSelectedPemesan(null)
+    }
+  }
+
+  const handlePMSelect = (pm: PenerimaManfaat | null) => {
+    if (pm) {
+      setFormData(prev => ({
+        ...prev,
+        id_penerima_manfaat: pm.id.toString()
+      }))
+      setSelectedPM(pm)
+    } else {
+      // Clear the selection
+      setFormData(prev => ({
+        ...prev,
+        id_penerima_manfaat: ""
+      }))
+      setSelectedPM(null)
+    }
+  }
+  
+  // Set selected pemesan and PM after both activity data and reference data are loaded
+  useEffect(() => {
+    // Only try to set selected pemesan and PM after both activity data and reference data are loaded
+    if (pemesans.length > 0 && penerimaManfaats.length > 0 && activityData) {
+      // Get activity data from form state
+      const activityIdPemesan = activityData.id_pemesan;
+      const activityIdPM = activityData.id_penerima_manfaat;
+      
+      // Set selected pemesan if it exists
+      if (activityIdPemesan && activityIdPemesan > 0) {
+        const pemesan = pemesans.find(p => p.id === activityIdPemesan);
+        if (pemesan) {
+          setSelectedPemesan(pemesan);
+          // Also update formData to ensure consistency
+          setFormData(prev => ({
+            ...prev,
+            id_pemesan: pemesan.id.toString()
+          }));
+        }
+      } else {
+        // Clear selected pemesan if no ID is set
+        setSelectedPemesan(null);
+      }
+      
+      // Set selected PM if it exists
+      if (activityIdPM && activityIdPM > 0) {
+        const pm = penerimaManfaats.find(p => p.id === activityIdPM);
+        if (pm) {
+          setSelectedPM(pm);
+          // Also update formData to ensure consistency
+          setFormData(prev => ({
+            ...prev,
+            id_penerima_manfaat: pm.id.toString()
+          }));
+        }
+      } else {
+        // Clear selected PM if no ID is set
+        setSelectedPM(null);
+      }
+    }
+  }, [pemesans, penerimaManfaats, activityData])
+
+  // Additional useEffect to handle cases where reference data loads after activity data
+  useEffect(() => {
+    if (activityData && (pemesans.length > 0 || penerimaManfaats.length > 0)) {
+      // Update pemesan if needed
+      if (activityData.id_pemesan && activityData.id_pemesan > 0 && pemesans.length > 0) {
+        const pemesan = pemesans.find(p => p.id === activityData.id_pemesan);
+        if (pemesan && !selectedPemesan) {
+          setSelectedPemesan(pemesan);
+          setFormData(prev => ({
+            ...prev,
+            id_pemesan: pemesan.id.toString()
+          }));
+        }
+      }
+      
+      // Update PM if needed
+      if (activityData.id_penerima_manfaat && activityData.id_penerima_manfaat > 0 && penerimaManfaats.length > 0) {
+        const pm = penerimaManfaats.find(p => p.id === activityData.id_penerima_manfaat);
+        if (pm && !selectedPM) {
+          setSelectedPM(pm);
+          setFormData(prev => ({
+            ...prev,
+            id_penerima_manfaat: pm.id.toString()
+          }));
+        }
+      }
+    }
+  }, [pemesans, penerimaManfaats, activityData, selectedPemesan, selectedPM])
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -522,6 +571,9 @@ export default function EditActivityPage({ params }: { params: { id: string } })
     
     // Required for non-admin users
     if (!isDriver && !formData.id_kantor) errors.id_kantor = true
+    
+    // Note: We're intentionally NOT validating that existing pemesan/PM data must be preserved
+    // This allows users to clear and change these fields if the existing data is incorrect
     
     // Update validation errors state
     setValidationErrors(errors)
@@ -546,6 +598,14 @@ export default function EditActivityPage({ params }: { params: { id: string } })
         ...formData,
         id: activityId,
         id_driver: driverId ? parseInt(driverId) : null,
+        // Use data from the read-only fields below the live search inputs
+        // If no changes were made via live search, preserve the original activity data
+        id_pemesan: selectedPemesan 
+          ? selectedPemesan.id 
+          : activityData?.id_pemesan || null,
+        id_penerima_manfaat: selectedPM 
+          ? selectedPM.id 
+          : activityData?.id_penerima_manfaat || null,
         // Convert numeric fields properly
         km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
         km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
@@ -555,9 +615,7 @@ export default function EditActivityPage({ params }: { params: { id: string } })
         id_reward: formData.id_reward ? parseInt(formData.id_reward) : null,
         id_kantor: formData.id_kantor ? parseInt(formData.id_kantor) : null,
         id_ambulan: formData.id_ambulan ? parseInt(formData.id_ambulan) : null,
-        id_detail: formData.id_detail ? parseInt(formData.id_detail) : null,
-        id_pemesan: formData.id_pemesan ? parseInt(formData.id_pemesan) : null,
-        id_penerima_manfaat: formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null
+        id_detail: formData.id_detail ? parseInt(formData.id_detail) : null
       }
       
       // Create FormData object to send both data and files
@@ -580,8 +638,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
       })
 
       if (response.ok) {
-        // Successfully updated, redirect back to detail page
-        router.push(`/activities/${activityId}`)
+        // Successfully updated, redirect to dashboard
+        router.push('/dashboard')
       } else {
         const errorData = await response.json()
         // Create a more detailed error message
@@ -598,8 +656,6 @@ export default function EditActivityPage({ params }: { params: { id: string } })
       setLoadingData(false)
     }
   }
-
-
 
   if (loading || loadingData) {
     return (
@@ -823,6 +879,28 @@ export default function EditActivityPage({ params }: { params: { id: string } })
               </datalist>
             </div>
             
+            {/* Biaya Antar - Read-only for drivers, auto-calculated */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Biaya Antar</label>
+              {isDriver ? (
+                <input
+                  type="number"
+                  name="biaya_antar"
+                  value={formData.biaya_antar}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              ) : (
+                <input
+                  type="number"
+                  name="biaya_antar"
+                  value={formData.biaya_antar}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              )}
+            </div>
+            
             {/* Reward (dalam Rupiah) */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Reward (Rp)</label>
@@ -952,167 +1030,184 @@ export default function EditActivityPage({ params }: { params: { id: string } })
             {/* Nama Pemesan - Live Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
-              <LiveSearchInput
-                items={pemesans}
-                onSelect={handlePemesanSelect}
-                placeholder="Cari atau ketik nama pemesan"
-                displayKey="nama_pemesan"
-                searchKeys={["nama_pemesan", "hp"]}
-                initialValue={selectedPemesan ? selectedPemesan.nama_pemesan : ""} // Add initial value
-                onCreate={() => setShowCreatePemesan(true)}
-              />
+              <div className={validationErrors.id_pemesan ? "ring-2 ring-red-500 rounded-md" : ""}>
+                <LiveSearchInput
+                  items={pemesans}
+                  onSelect={handlePemesanSelect}
+                  onAutoFill={handlePemesanSelect}
+                  placeholder="Cari atau ketik nama pemesan/no HP"
+                  displayKey="nama_pemesan"
+                  searchKeys={["nama_pemesan", "hp"]}
+                  initialValue={""}
+                  initialItemId={undefined}
+                  onCreate={() => setShowCreatePemesan(true)}
+                  name="id_pemesan"
+                  allowClear={true} // Allow clearing the field
+                />
+              </div>
+              {validationErrors.id_pemesan && (
+                <p className="mt-1 text-sm text-red-600">Nama Pemesan wajib diisi</p>
+              )}
             </div>
             
-            {/* Detail Pemesan (Read-only) - Always show when there's existing data or when selected */}
-            {(selectedPemesan || formData.id_pemesan) && (
-              <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
-                  <input
-                    type="text"
-                    value={selectedPemesan?.nama_pemesan || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">No HP</label>
-                  <input
-                    type="text"
-                    value={selectedPemesan?.hp || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
+            {/* Detail Pemesan (Read-only) - Always show current data or selected data */}
+            <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nama Pemesan Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPemesan?.nama_pemesan || activityData?.nama_pemesan || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
               </div>
-            )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">No HP Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPemesan?.hp || activityData?.hp || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+            </div>
             
             {/* Nama PM - Live Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Nama PM</label>
-              <LiveSearchInput
-                items={penerimaManfaats}
-                onSelect={handlePMSelect}
-                placeholder="Cari atau ketik nama PM"
-                displayKey="nama_pm"
-                searchKeys={["nama_pm"]}
-                initialValue={selectedPM ? selectedPM.nama_pm : ""} // Add initial value
-                onCreate={() => setShowCreatePM(true)}
-              />
+              <div className={validationErrors.id_penerima_manfaat ? "ring-2 ring-red-500 rounded-md" : ""}>
+                <LiveSearchInput
+                  items={penerimaManfaats}
+                  onSelect={handlePMSelect}
+                  placeholder="Cari atau ketik nama PM"
+                  displayKey="nama_pm"
+                  searchKeys={["nama_pm"]}
+                  initialValue={""}
+                  initialItemId={undefined}
+                  onCreate={() => setShowCreatePM(true)}
+                  name="id_penerima_manfaat"
+                  allowClear={true} // Allow clearing the field
+                />
+              </div>
+              {validationErrors.id_penerima_manfaat && (
+                <p className="mt-1 text-sm text-red-600">Nama PM wajib diisi</p>
+              )}
             </div>
             
-            {/* Detail PM (Read-only) - Always show when there's existing data or when selected */}
-            {(selectedPM || formData.id_penerima_manfaat) && (
-              <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Nama PM</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.nama_pm || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Alamat PM</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.alamat_pm || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Jenis Kelamin</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.jenis_kelamin_pm || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Usia</label>
-                  <input
-                    type="text"
-                    value={
-                      selectedPM?.usia_pm !== undefined && selectedPM?.usia_pm !== null 
-                        ? selectedPM?.usia_pm.toString() 
-                        : "Tidak ada data"
-                    }
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">NIK</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.nik || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">No KK</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.no_kk || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Tempat Lahir</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.tempat_lahir || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.tgl_lahir || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Status Marital</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.status_marital || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Agama</label>
-                  <input
-                    type="text"
-                    value={selectedPM?.agama || "Tidak ada data"}
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Asnaf</label>
-                  <input
-                    type="text"
-                    value={
-                      selectedPM?.id_asnaf 
-                        ? asnafs.find(a => a.id === selectedPM?.id_asnaf)?.asnaf || "Tidak ada data"
-                        : "Tidak ada data"
-                    }
-                    readOnly
-                    className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                  />
-                </div>
+            {/* Detail PM (Read-only) - Always show current data or selected data */}
+            <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nama PM Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.nama_pm || activityData?.nama_pm || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
               </div>
-            )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Alamat PM Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.alamat_pm || activityData?.alamat_pm || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Jenis Kelamin Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.jenis_kelamin_pm || activityData?.jenis_kelamin_pm || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Usia Saat Ini</label>
+                <input
+                  type="text"
+                  value={
+                    selectedPM?.usia_pm !== undefined && selectedPM?.usia_pm !== null 
+                      ? selectedPM?.usia_pm.toString() 
+                      : activityData?.usia_pm !== undefined && activityData?.usia_pm !== null
+                      ? activityData?.usia_pm.toString()
+                      : "Tidak ada data"
+                  }
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">NIK Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.nik || activityData?.nik || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">No KK Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.no_kk || activityData?.no_kk || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Tempat Lahir Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.tempat_lahir || activityData?.tempat_lahir || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Tanggal Lahir Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.tgl_lahir || activityData?.tgl_lahir || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Status Marital Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.status_marital || activityData?.status_marital || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Agama Saat Ini</label>
+                <input
+                  type="text"
+                  value={selectedPM?.agama || activityData?.agama || "Tidak ada data"}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Asnaf Saat Ini</label>
+                <input
+                  type="text"
+                  value={
+                    selectedPM?.id_asnaf 
+                      ? asnafs.find(a => a.id === selectedPM?.id_asnaf)?.asnaf || "Tidak ada data"
+                      : activityData?.id_asnaf 
+                      ? asnafs.find(a => a.id === activityData?.id_asnaf)?.asnaf || "Tidak ada data"
+                      : "Tidak ada data"
+                  }
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+            </div>
             
             {/* Kegiatan */}
             <div>
@@ -1273,7 +1368,7 @@ export default function EditActivityPage({ params }: { params: { id: string } })
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push(`/activities/${activityId}`)}
+              onClick={() => router.push('/dashboard')}
             >
               Batal
             </Button>
@@ -1502,4 +1597,3 @@ export default function EditActivityPage({ params }: { params: { id: string } })
     </DashboardLayout>
   )
 }
-

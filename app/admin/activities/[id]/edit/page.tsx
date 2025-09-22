@@ -62,34 +62,47 @@ interface Reward {
 }
 
 interface Activity {
-  id: number
-  tgl: string
-  tgl_pulang: string
-  id_ambulan: number
-  id_detail: number
-  jam_berangkat: string
-  jam_pulang: string
-  id_driver: number
-  asisten_luar_kota: string
-  area: string
-  dari: string
-  tujuan: string
-  km_awal: number
-  km_akhir: number
-  biaya_antar: number
-  biaya_dibayar: number
-  id_pemesan: number
-  id_penerima_manfaat: number
-  infaq: number
-  id_reward: number
-  kegiatan: string
-  rumpun_program: string
-  id_kantor?: number
+  id: number;
+  tgl: string;
+  tgl_pulang: string;
+  id_ambulan: number;
+  id_detail: number;
+  jam_berangkat: string;
+  jam_pulang: string;
+  id_driver: number;
+  asisten_luar_kota: string;
+  area: string;
+  dari: string;
+  tujuan: string;
+  km_awal: number;
+  km_akhir: number;
+  biaya_antar: number;
+  biaya_dibayar: number;
+  id_pemesan: number;
+  id_penerima_manfaat: number;
+  infaq: number;
+  id_reward: number;
+  kegiatan: string;
+  rumpun_program: string;
+  id_kantor?: number;
   documentation?: Array<{
-    id: number
-    url: string
-    created_at: string
-  }>
+    id: number;
+    url: string;
+    created_at: string;
+  }>;
+  nama_pemesan: string;
+  hp: string;
+  nama_pm: string;
+  alamat_pm: string | null;
+  jenis_kelamin_pm: string | null;
+  usia_pm: number | null;
+  nik: string | null;
+  no_kk: string | null;
+  tempat_lahir: string | null;
+  tgl_lahir: string | null;
+  status_marital: string | null;
+  agama: string | null;
+  id_asnaf: number | null;
 }
 
 interface ActivityDetail extends Activity {
@@ -112,6 +125,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
   const [loadingData, setLoadingData] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
+  const [activityData, setActivityData] = useState<ActivityDetail | null>(null)
 
   // State for documentation files
   const [documentationFiles, setDocumentationFiles] = useState<File[]>([])
@@ -203,6 +217,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       }
       
       const activity: ActivityDetail = await response.json()
+      setActivityData(activity);
       
       // Set form data with activity values
       setFormData({
@@ -330,20 +345,38 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.km_awal, formData.km_akhir])
 
-  const handlePemesanSelect = (pemesan: Pemesan) => {
-    setFormData(prev => ({
-      ...prev,
-      id_pemesan: pemesan.id.toString()
-    }))
-    setSelectedPemesan(pemesan)
+  const handlePemesanSelect = (pemesan: Pemesan | null) => {
+    if (pemesan) {
+      setFormData(prev => ({
+        ...prev,
+        id_pemesan: pemesan.id.toString()
+      }))
+      setSelectedPemesan(pemesan)
+    } else {
+      // Clear the selection
+      setFormData(prev => ({
+        ...prev,
+        id_pemesan: ""
+      }))
+      setSelectedPemesan(null)
+    }
   }
 
-  const handlePMSelect = (pm: PenerimaManfaat) => {
-    setFormData(prev => ({
-      ...prev,
-      id_penerima_manfaat: pm.id.toString()
-    }))
-    setSelectedPM(pm)
+  const handlePMSelect = (pm: PenerimaManfaat | null) => {
+    if (pm) {
+      setFormData(prev => ({
+        ...prev,
+        id_penerima_manfaat: pm.id.toString()
+      }))
+      setSelectedPM(pm)
+    } else {
+      // Clear the selection
+      setFormData(prev => ({
+        ...prev,
+        id_penerima_manfaat: ""
+      }))
+      setSelectedPM(null)
+    }
   }
 
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -451,16 +484,21 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
   // Set selected pemesan and PM after both activity data and reference data are loaded
   useEffect(() => {
     // Only try to set selected pemesan and PM after both activity data and reference data are loaded
-    if (pemesans.length > 0 && penerimaManfaats.length > 0) {
+    if (pemesans.length > 0 && penerimaManfaats.length > 0 && activityData) {
       // Get activity data from form state
-      const activityIdPemesan = formData.id_pemesan ? parseInt(formData.id_pemesan) : null;
-      const activityIdPM = formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null;
+      const activityIdPemesan = activityData.id_pemesan;
+      const activityIdPM = activityData.id_penerima_manfaat;
       
       // Set selected pemesan if it exists
-      if (activityIdPemesan) {
+      if (activityIdPemesan && activityIdPemesan > 0) {
         const pemesan = pemesans.find(p => p.id === activityIdPemesan);
         if (pemesan) {
           setSelectedPemesan(pemesan);
+          // Also update formData to ensure consistency
+          setFormData(prev => ({
+            ...prev,
+            id_pemesan: pemesan.id.toString()
+          }));
         }
       } else {
         // Clear selected pemesan if no ID is set
@@ -468,17 +506,51 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       }
       
       // Set selected PM if it exists
-      if (activityIdPM) {
+      if (activityIdPM && activityIdPM > 0) {
         const pm = penerimaManfaats.find(p => p.id === activityIdPM);
         if (pm) {
           setSelectedPM(pm);
+          // Also update formData to ensure consistency
+          setFormData(prev => ({
+            ...prev,
+            id_penerima_manfaat: pm.id.toString()
+          }));
         }
       } else {
         // Clear selected PM if no ID is set
         setSelectedPM(null);
       }
     }
-  }, [pemesans, penerimaManfaats, formData.id_pemesan, formData.id_penerima_manfaat])
+  }, [pemesans, penerimaManfaats, activityData])
+
+  // Additional useEffect to handle cases where reference data loads after activity data
+  useEffect(() => {
+    if (activityData && (pemesans.length > 0 || penerimaManfaats.length > 0)) {
+      // Update pemesan if needed
+      if (activityData.id_pemesan && activityData.id_pemesan > 0 && pemesans.length > 0) {
+        const pemesan = pemesans.find(p => p.id === activityData.id_pemesan);
+        if (pemesan && !selectedPemesan) {
+          setSelectedPemesan(pemesan);
+          setFormData(prev => ({
+            ...prev,
+            id_pemesan: pemesan.id.toString()
+          }));
+        }
+      }
+      
+      // Update PM if needed
+      if (activityData.id_penerima_manfaat && activityData.id_penerima_manfaat > 0 && penerimaManfaats.length > 0) {
+        const pm = penerimaManfaats.find(p => p.id === activityData.id_penerima_manfaat);
+        if (pm && !selectedPM) {
+          setSelectedPM(pm);
+          setFormData(prev => ({
+            ...prev,
+            id_penerima_manfaat: pm.id.toString()
+          }));
+        }
+      }
+    }
+  }, [pemesans, penerimaManfaats, activityData, selectedPemesan, selectedPM])
 
   const handleDocumentationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -511,6 +583,9 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     if (!formData.tujuan) errors.tujuan = true
     if (!formData.id_driver) errors.id_driver = true
     if (!formData.id_kantor) errors.id_kantor = true
+    
+    // Note: We're intentionally NOT validating that existing pemesan/PM data must be preserved
+    // This allows users to clear and change these fields if the existing data is incorrect
     
     // Update validation errors state
     setValidationErrors(errors)
@@ -563,8 +638,8 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       })
 
       if (response.ok) {
-        // Successfully updated, redirect back to detail page
-        router.push(`/admin/activities/${activityId}`)
+        // Successfully updated, redirect to dashboard
+        router.push('/dashboard')
       } else {
         const errorData = await response.json()
         // Create a more detailed error message
@@ -919,22 +994,26 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               <LiveSearchInput
                 items={pemesans}
                 onSelect={handlePemesanSelect}
-                placeholder="Cari atau ketik nama pemesan"
+                onAutoFill={handlePemesanSelect}
+                placeholder="Cari atau ketik nama pemesan/no HP"
                 displayKey="nama_pemesan"
                 searchKeys={["nama_pemesan", "hp"]}
-                initialValue={selectedPemesan ? selectedPemesan.nama_pemesan : ""} // Add initial value
+                initialValue={activityData?.nama_pemesan || ""}
+                initialItemId={activityData?.id_pemesan || undefined}
                 onCreate={() => setShowCreatePemesan(true)}
+                name="id_pemesan"
+                allowClear={true} // Allow clearing the field
               />
             </div>
             
             {/* Detail Pemesan (Read-only) - Always show when there's existing data or when selected */}
-            {(selectedPemesan || formData.id_pemesan) && (
+            {(selectedPemesan || (activityData?.id_pemesan && activityData?.id_pemesan > 0)) && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
                   <input
                     type="text"
-                    value={selectedPemesan?.nama_pemesan || "Tidak ada data"}
+                    value={selectedPemesan?.nama_pemesan || activityData?.nama_pemesan || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -943,7 +1022,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">No HP</label>
                   <input
                     type="text"
-                    value={selectedPemesan?.hp || "Tidak ada data"}
+                    value={selectedPemesan?.hp || activityData?.hp || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -960,19 +1039,22 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 placeholder="Cari atau ketik nama PM"
                 displayKey="nama_pm"
                 searchKeys={["nama_pm"]}
-                initialValue={selectedPM ? selectedPM.nama_pm : ""} // Add initial value
+                initialValue={activityData?.nama_pm || ""}
+                initialItemId={activityData?.id_penerima_manfaat || undefined}
                 onCreate={() => setShowCreatePM(true)}
+                name="id_penerima_manfaat"
+                allowClear={true} // Allow clearing the field
               />
             </div>
             
             {/* Detail PM (Read-only) - Always show when there's existing data or when selected */}
-            {(selectedPM || formData.id_penerima_manfaat) && (
+            {(selectedPM || (activityData?.id_penerima_manfaat && activityData?.id_penerima_manfaat > 0)) && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Nama PM</label>
                   <input
                     type="text"
-                    value={selectedPM?.nama_pm || "Tidak ada data"}
+                    value={selectedPM?.nama_pm || activityData?.nama_pm || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -981,7 +1063,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Alamat PM</label>
                   <input
                     type="text"
-                    value={selectedPM?.alamat_pm || "Tidak ada data"}
+                    value={selectedPM?.alamat_pm || activityData?.alamat_pm || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -990,7 +1072,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Jenis Kelamin</label>
                   <input
                     type="text"
-                    value={selectedPM?.jenis_kelamin_pm || "Tidak ada data"}
+                    value={selectedPM?.jenis_kelamin_pm || activityData?.jenis_kelamin_pm || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1002,6 +1084,8 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                     value={
                       selectedPM?.usia_pm !== undefined && selectedPM?.usia_pm !== null 
                         ? selectedPM?.usia_pm.toString() 
+                        : activityData?.usia_pm !== undefined && activityData?.usia_pm !== null
+                        ? activityData?.usia_pm.toString()
                         : "Tidak ada data"
                     }
                     readOnly
@@ -1012,7 +1096,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">NIK</label>
                   <input
                     type="text"
-                    value={selectedPM?.nik || "Tidak ada data"}
+                    value={selectedPM?.nik || activityData?.nik || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1021,7 +1105,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">No KK</label>
                   <input
                     type="text"
-                    value={selectedPM?.no_kk || "Tidak ada data"}
+                    value={selectedPM?.no_kk || activityData?.no_kk || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1030,7 +1114,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Tempat Lahir</label>
                   <input
                     type="text"
-                    value={selectedPM?.tempat_lahir || "Tidak ada data"}
+                    value={selectedPM?.tempat_lahir || activityData?.tempat_lahir || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1039,7 +1123,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
                   <input
                     type="text"
-                    value={selectedPM?.tgl_lahir || "Tidak ada data"}
+                    value={selectedPM?.tgl_lahir || activityData?.tgl_lahir || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1048,7 +1132,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Status Marital</label>
                   <input
                     type="text"
-                    value={selectedPM?.status_marital || "Tidak ada data"}
+                    value={selectedPM?.status_marital || activityData?.status_marital || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1057,7 +1141,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Agama</label>
                   <input
                     type="text"
-                    value={selectedPM?.agama || "Tidak ada data"}
+                    value={selectedPM?.agama || activityData?.agama || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1115,7 +1199,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   aria-hidden="true"
                 >
                   <path
-                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28M8 32l4 4m4-24h8m-4-4v8m-12 4h.02"
                     strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1224,7 +1308,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push(`/admin/activities/${activityId}`)}
+              onClick={() => router.push('/dashboard')}
             >
               Batal
             </Button>
@@ -1453,5 +1537,3 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     </DashboardLayout>
   )
 }
-
-
