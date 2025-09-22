@@ -16,7 +16,6 @@ export interface Activity {
   nama_pemesan: string
   hp: string
   nama_pm: string
-  // Additional fields for detail view
   area?: string
   asisten_luar_kota?: string
   alamat_pm?: string
@@ -43,16 +42,16 @@ export interface Activity {
     id: number
     name: string
   }
+  // Tambahkan foreign key yang mungkin ada
+  id_pemesan?: number | null
+  id_penerima_manfaat?: number | null
 }
 
 export interface ActivityDetail extends Activity {
-  // Additional fields needed for edit form
   id_kantor: number | null
   id_ambulan: number | null
   id_detail: number | null
   id_driver: number | null
-  id_pemesan: number | null
-  id_penerima_manfaat: number | null
   id_reward: number | null
   biaya_antar: number | null
   documentation?: Array<{
@@ -486,7 +485,7 @@ export async function getActivityByIdWithReferences(id: number): Promise<Activit
 }
 
 // Get activity by ID
-export async function getActivityById(id: number): Promise<Activity | null> {
+export async function getActivityById(id: number): Promise<ActivityDetail | null> {
   const result = await sql`
     SELECT 
       a.id, a.tgl as tgl_berangkat, a.tgl_pulang, da.detail_antar as detail, a.dari,
@@ -522,7 +521,8 @@ export async function getActivityById(id: number): Promise<Activity | null> {
         END) as id_asnaf,
       amb.id as ambulance_id, amb.nopol, '' as kode,
       a.id_driver as driver_id,
-      d.driver as driver_name
+      d.driver as driver_name,
+      a.id_pemesan, a.id_penerima_manfaat
     FROM ambulan_activity a
     LEFT JOIN pemesan p ON a.id_pemesan = p.id
     LEFT JOIN penerima_manfaat pm ON a.id_penerima_manfaat = pm.id
@@ -570,6 +570,8 @@ export async function getActivityById(id: number): Promise<Activity | null> {
     infaq: row.infaq !== null ? row.infaq : null,
     biaya_dibayar: row.biaya_dibayar !== null ? row.biaya_dibayar : null,
     id_asnaf: row.id_asnaf,
+    id_pemesan: row.id_pemesan,
+    id_penerima_manfaat: row.id_penerima_manfaat,
     ambulance: {
       id: row.ambulance_id,
       nopol: row.nopol,
@@ -579,5 +581,5 @@ export async function getActivityById(id: number): Promise<Activity | null> {
       id: row.driver_id,
       name: row.driver_name || 'Unknown Driver',
     },
-  }
+  } as ActivityDetail
 }

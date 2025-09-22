@@ -250,9 +250,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         setExistingDocumentation(activity.documentation)
       }
       
-      // Store activity data to be processed after reference data is loaded
-      // This will be handled in a useEffect that watches for pemesans and penerimaManfaats updates
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memuat data aktivitas")
       console.error(err)
@@ -265,7 +262,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     try {
       setLoadingData(true)
       
-      // Fetch all reference data in parallel
       const [
         kantorRes,
         ambulanRes,
@@ -310,7 +306,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       [name]: value
     }))
     
-    // Clear validation error for this field
     if (validationErrors[name]) {
       setValidationErrors(prev => {
         const newErrors = { ...prev }
@@ -319,21 +314,17 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       })
     }
     
-    // Clear general error message
     if (error) {
       setError(null)
     }
   }
 
-  // Automatically calculate biaya_antar when km_awal or km_akhir changes
   useEffect(() => {
     const kmAwal = parseInt(formData.km_awal) || 0
     const kmAkhir = parseInt(formData.km_akhir) || 0
     
-    // Only calculate if both values are valid and km_akhir >= km_awal
     if (kmAwal >= 0 && kmAkhir >= 0 && kmAkhir >= kmAwal) {
-      const biaya = (kmAkhir - kmAwal) * 6000  // Changed from 3000 to 6000 Rupiah per kilometer
-      // Only update if the calculated value is different to prevent infinite loop
+      const biaya = (kmAkhir - kmAwal) * 6000
       if (formData.biaya_antar !== biaya.toString()) {
         setFormData(prev => ({
           ...prev,
@@ -341,8 +332,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         }))
       }
     }
-    // We intentionally exclude formData.biaya_antar from dependencies to avoid infinite loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.km_awal, formData.km_akhir])
 
   const handlePemesanSelect = (pemesan: Pemesan | null) => {
@@ -353,7 +342,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       }))
       setSelectedPemesan(pemesan)
     } else {
-      // Clear the selection
       setFormData(prev => ({
         ...prev,
         id_pemesan: ""
@@ -370,7 +358,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       }))
       setSelectedPM(pm)
     } else {
-      // Clear the selection
       setFormData(prev => ({
         ...prev,
         id_penerima_manfaat: ""
@@ -381,7 +368,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
 
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
-    // Temukan reward berdasarkan jenis dan tipe
     const reward = rewards.find(r => `${r.jenis} - ${r.tipe}` === value)
     setFormData(prev => ({
       ...prev,
@@ -402,18 +388,13 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
 
       if (response.ok) {
         const createdPemesan = await response.json()
-        // Add to pemesans list
         setPemesans(prev => [...prev, createdPemesan])
-        // Set as selected
         setFormData(prev => ({
           ...prev,
           id_pemesan: createdPemesan.id.toString()
         }))
-        // Update search field
         handlePemesanSelect(createdPemesan)
-        // Close the create form
         setShowCreatePemesan(false)
-        // Reset form
         setNewPemesan({
           nama_pemesan: "",
           hp: ""
@@ -438,7 +419,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         },
         body: JSON.stringify({
           ...newPM,
-          // Convert numeric fields
           usia_pm: newPM.usia_pm ? parseInt(newPM.usia_pm) : null,
           id_asnaf: newPM.id_asnaf ? parseInt(newPM.id_asnaf) : null
         })
@@ -446,18 +426,13 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
 
       if (response.ok) {
         const createdPM = await response.json()
-        // Add to penerima manfaats list
         setPenerimaManfaats(prev => [...prev, createdPM])
-        // Set as selected
         setFormData(prev => ({
           ...prev,
           id_penerima_manfaat: createdPM.id.toString()
         }))
-        // Update search field
         handlePMSelect(createdPM)
-        // Close the create form
         setShowCreatePM(false)
-        // Reset form
         setNewPM({
           nama_pm: "",
           alamat_pm: "",
@@ -481,52 +456,41 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     }
   }
 
-  // Set selected pemesan and PM after both activity data and reference data are loaded
   useEffect(() => {
-    // Only try to set selected pemesan and PM after both activity data and reference data are loaded
     if (pemesans.length > 0 && penerimaManfaats.length > 0 && activityData) {
-      // Get activity data from form state
       const activityIdPemesan = activityData.id_pemesan;
       const activityIdPM = activityData.id_penerima_manfaat;
       
-      // Set selected pemesan if it exists
       if (activityIdPemesan && activityIdPemesan > 0) {
         const pemesan = pemesans.find(p => p.id === activityIdPemesan);
         if (pemesan) {
           setSelectedPemesan(pemesan);
-          // Also update formData to ensure consistency
           setFormData(prev => ({
             ...prev,
             id_pemesan: pemesan.id.toString()
           }));
         }
       } else {
-        // Clear selected pemesan if no ID is set
         setSelectedPemesan(null);
       }
       
-      // Set selected PM if it exists
       if (activityIdPM && activityIdPM > 0) {
         const pm = penerimaManfaats.find(p => p.id === activityIdPM);
         if (pm) {
           setSelectedPM(pm);
-          // Also update formData to ensure consistency
           setFormData(prev => ({
             ...prev,
             id_penerima_manfaat: pm.id.toString()
           }));
         }
       } else {
-        // Clear selected PM if no ID is set
         setSelectedPM(null);
       }
     }
   }, [pemesans, penerimaManfaats, activityData])
 
-  // Additional useEffect to handle cases where reference data loads after activity data
   useEffect(() => {
     if (activityData && (pemesans.length > 0 || penerimaManfaats.length > 0)) {
-      // Update pemesan if needed
       if (activityData.id_pemesan && activityData.id_pemesan > 0 && pemesans.length > 0) {
         const pemesan = pemesans.find(p => p.id === activityData.id_pemesan);
         if (pemesan && !selectedPemesan) {
@@ -538,7 +502,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         }
       }
       
-      // Update PM if needed
       if (activityData.id_penerima_manfaat && activityData.id_penerima_manfaat > 0 && penerimaManfaats.length > 0) {
         const pm = penerimaManfaats.find(p => p.id === activityData.id_penerima_manfaat);
         if (pm && !selectedPM) {
@@ -570,10 +533,8 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validate required fields
     const errors: Record<string, boolean> = {}
     
-    // Always required fields
     if (!formData.tgl) errors.tgl = true
     if (!formData.id_ambulan) errors.id_ambulan = true
     if (!formData.id_detail) errors.id_detail = true
@@ -584,13 +545,8 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     if (!formData.id_driver) errors.id_driver = true
     if (!formData.id_kantor) errors.id_kantor = true
     
-    // Note: We're intentionally NOT validating that existing pemesan/PM data must be preserved
-    // This allows users to clear and change these fields if the existing data is incorrect
-    
-    // Update validation errors state
     setValidationErrors(errors)
     
-    // If there are validation errors, don't submit
     if (Object.keys(errors).length > 0) {
       setError("Harap lengkapi semua field yang wajib diisi")
       return
@@ -599,12 +555,10 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     try {
       setLoadingData(true)
       
-      // Prepare data to send with proper type conversions
       const dataToSend = {
         ...formData,
         id: activityId,
         id_driver: formData.id_driver ? parseInt(formData.id_driver) : null,
-        // Convert numeric fields properly
         km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
         km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
         biaya_antar: formData.biaya_antar ? parseInt(formData.biaya_antar) : 0,
@@ -618,16 +572,13 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         id_penerima_manfaat: formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null
       }
       
-      // Create FormData object to send both data and files
       const formDataObj = new FormData()
       formDataObj.append("data", JSON.stringify(dataToSend))
       
-      // Add new documentation files
       documentationFiles.forEach(file => {
         formDataObj.append("documentation", file)
       })
       
-      // Add existing documentation that wasn't removed
       existingDocumentation.forEach(doc => {
         formDataObj.append("existingDocumentation", doc.id.toString())
       })
@@ -638,11 +589,9 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       })
 
       if (response.ok) {
-        // Successfully updated, redirect to dashboard
         router.push('/dashboard')
       } else {
         const errorData = await response.json()
-        // Create a more detailed error message
         let errorMessage = errorData.error || "Gagal memperbarui aktivitas"
         if (errorData.details) {
           errorMessage += `: ${errorData.details}`
@@ -716,7 +665,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {/* Kantor */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Kantor</label>
               <select
@@ -738,7 +686,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* Tanggal */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Tanggal</label>
               <input
@@ -754,7 +701,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* Ambulan */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Ambulan</label>
               <select
@@ -776,7 +722,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* Detail */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Detail</label>
               <select
@@ -798,7 +743,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* Jam Berangkat */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Jam Berangkat</label>
               <input
@@ -814,7 +758,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* Jam Pulang */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Jam Pulang</label>
               <input
@@ -830,7 +773,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* Driver */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Driver</label>
               <select
@@ -852,7 +794,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* Jenis (Reward) - Diubah menjadi textbox */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Jenis</label>
               <input
@@ -872,7 +813,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               </datalist>
             </div>
             
-            {/* Reward (dalam Rupiah) */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Reward (Rp)</label>
               <input
@@ -886,7 +826,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* Asisten Luar Kota */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Asisten Luar Kota</label>
               <input
@@ -898,7 +837,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* Area */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Area</label>
               <input
@@ -910,7 +848,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* Dari */}
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700">Dari</label>
               <textarea
@@ -925,7 +862,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* Tujuan */}
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700">Tujuan</label>
               <textarea
@@ -940,7 +876,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
-            {/* KM Awal */}
             <div>
               <label className="block text-sm font-medium text-gray-700">KM Awal</label>
               <input
@@ -952,7 +887,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* KM Akhir */}
             <div>
               <label className="block text-sm font-medium text-gray-700">KM Akhir</label>
               <input
@@ -964,7 +898,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* Biaya Antar - Editable for admin */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Biaya Antar</label>
               <input
@@ -976,7 +909,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* Biaya yang Dibayar */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Biaya yang Dibayar</label>
               <input
@@ -988,7 +920,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* Nama Pemesan - Live Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
               <LiveSearchInput
@@ -1002,11 +933,10 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 initialItemId={activityData?.id_pemesan || undefined}
                 onCreate={() => setShowCreatePemesan(true)}
                 name="id_pemesan"
-                allowClear={true} // Allow clearing the field
+                allowClear={true}
               />
             </div>
             
-            {/* Detail Pemesan (Read-only) - Always show when there's existing data or when selected */}
             {(selectedPemesan || (activityData?.id_pemesan && activityData?.id_pemesan > 0)) && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -1030,7 +960,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               </div>
             )}
             
-            {/* Nama PM - Live Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Nama PM</label>
               <LiveSearchInput
@@ -1043,11 +972,10 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 initialItemId={activityData?.id_penerima_manfaat || undefined}
                 onCreate={() => setShowCreatePM(true)}
                 name="id_penerima_manfaat"
-                allowClear={true} // Allow clearing the field
+                allowClear={true}
               />
             </div>
             
-            {/* Detail PM (Read-only) - Always show when there's existing data or when selected */}
             {(selectedPM || (activityData?.id_penerima_manfaat && activityData?.id_penerima_manfaat > 0)) && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -1149,7 +1077,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               </div>
             )}
             
-            {/* Kegiatan */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Kegiatan</label>
               <input
@@ -1161,7 +1088,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* Rumpun Program */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Rumpun Program</label>
               <input
@@ -1173,7 +1099,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               />
             </div>
             
-            {/* Infaq */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Infaq</label>
               <input
@@ -1186,7 +1111,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
             </div>
           </div>
           
-          {/* Documentation Upload */}
           <div className="sm:col-span-2 mt-6">
             <label className="block text-sm font-medium text-gray-700">Dokumentasi</label>
             <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
@@ -1227,7 +1151,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               </div>
             </div>
             
-            {/* Display existing documentation files */}
             {existingDocumentation.length > 0 && (
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-gray-700">Dokumentasi yang sudah ada:</h4>
@@ -1265,7 +1188,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               </div>
             )}
             
-            {/* Display selected files */}
             {documentationFiles.length > 0 && (
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-gray-700">File yang dipilih:</h4>
@@ -1323,7 +1245,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         </form>
       </div>
 
-      {/* Create Pemesan Modal */}
       {showCreatePemesan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50" style={{ zIndex: 9999 }}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md border-4 border-red-500">
@@ -1382,7 +1303,6 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         </div>
       )}
 
-      {/* Create PM Modal */}
       {showCreatePM && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50" style={{ zIndex: 9999 }}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border-4 border-blue-500">

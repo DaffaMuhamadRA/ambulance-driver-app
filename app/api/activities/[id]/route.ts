@@ -57,7 +57,7 @@ export async function GET(
       // Check if the activity's driver ID matches the current user's driver ID
       // If user.id_driver is null/undefined, fallback to user.id for comparison
       const userDriverId = session.user.id_driver || session.user.id
-      if (activity.user.id !== userDriverId) {
+      if (userDriverId === null || activity.user.id !== userDriverId) {
         return NextResponse.json(
           { error: "Forbidden" },
           { status: 403 }
@@ -120,6 +120,20 @@ export async function PUT(
       )
     }
     
+    // Fetch the existing activity from the database
+    const existingActivity = await getActivityByIdWithReferences(activityId);
+    if (!existingActivity) {
+      return NextResponse.json({ error: "Activity not found" }, { status: 404 });
+    }
+
+    // Authorization check
+    if (session.user.role === "driver") {
+      const userDriverId = session.user.id_driver || session.user.id;
+      if (userDriverId === null || existingActivity.user.id !== userDriverId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+    
     // Parse form data
     const formData = await request.formData()
     const body = JSON.parse(formData.get("data") as string || "{}")
@@ -164,20 +178,6 @@ export async function PUT(
       )
     }
     
-    // Check if the activity belongs to the user
-    if (session.user.role === "driver") {
-      // For drivers, use their own ID as the driver ID
-      const userDriverId = session.user.id_driver || session.user.id
-      
-      // Fetch the existing activity to verify ownership
-      const existingActivity = await getActivityById(activityId)
-      if (!existingActivity || existingActivity.user.id !== userDriverId) {
-        return NextResponse.json(
-          { error: "Forbidden" },
-          { status: 403 }
-        )
-      }
-    }
     
     // Calculate derived fields with error handling
     let tglDate: Date;
@@ -252,104 +252,103 @@ export async function PUT(
     const keterbatasan = "Tidak";
     
     // Parse optional numeric fields
-    let biaya_dibayar_num: number | null = null;
+    // Server-Side Reconciliation: Use existing values when not provided by frontend
+    let biaya_dibayar_num: number | null = existingActivity.biaya_dibayar ?? null;
     if (biaya_dibayar) {
       try {
-        biaya_dibayar_num = parseInt(biaya_dibayar);
-        if (isNaN(biaya_dibayar_num)) {
-          biaya_dibayar_num = null;
+        const parsedValue = parseInt(biaya_dibayar);
+        if (!isNaN(parsedValue)) {
+          biaya_dibayar_num = parsedValue;
         }
       } catch (e) {
-        biaya_dibayar_num = null;
+        // Keep existing value
       }
     }
     
-    let infaq_num: number | null = null;
+    // Server-Side Reconciliation: Use existing values when not provided by frontend
+    let infaq_num: number | null = existingActivity.infaq ?? null;
     if (infaq) {
       try {
-        infaq_num = parseInt(infaq);
-        if (isNaN(infaq_num)) {
-          infaq_num = null;
+        const parsedValue = parseInt(infaq);
+        if (!isNaN(parsedValue)) {
+          infaq_num = parsedValue;
         }
       } catch (e) {
-        infaq_num = null;
+        // Keep existing value
       }
     }
     
-    let id_reward_num: number | null = null;
+    // Server-Side Reconciliation: Use existing values when not provided by frontend
+    let id_reward_num: number | null = existingActivity.id_reward ?? null;
     if (id_reward) {
       try {
-        id_reward_num = parseInt(id_reward);
-        if (isNaN(id_reward_num)) {
-          id_reward_num = null;
+        const parsedId = parseInt(id_reward);
+        if (!isNaN(parsedId)) {
+          id_reward_num = parsedId;
         }
       } catch (e) {
-        id_reward_num = null;
+        // Keep existing value
       }
     }
     
-    let id_ambulan_num: number | null = null;
+    // Server-Side Reconciliation: Use existing values when not provided by frontend
+    let id_ambulan_num: number | null = existingActivity.id_ambulan ?? null;
     if (id_ambulan) {
       try {
-        id_ambulan_num = parseInt(id_ambulan);
-        if (isNaN(id_ambulan_num)) {
-          id_ambulan_num = null;
+        const parsedId = parseInt(id_ambulan);
+        if (!isNaN(parsedId)) {
+          id_ambulan_num = parsedId;
         }
       } catch (e) {
-        id_ambulan_num = null;
+        // Keep existing value
       }
     }
     
-    let id_detail_num: number | null = null;
+    // Server-Side Reconciliation: Use existing values when not provided by frontend
+    let id_detail_num: number | null = existingActivity.id_detail ?? null;
     if (id_detail) {
       try {
-        id_detail_num = parseInt(id_detail);
-        if (isNaN(id_detail_num)) {
-          id_detail_num = null;
+        const parsedId = parseInt(id_detail);
+        if (!isNaN(parsedId)) {
+          id_detail_num = parsedId;
         }
       } catch (e) {
-        id_detail_num = null;
+        // Keep existing value
       }
     }
     
-    let id_pemesan_num: number | null = null;
+    // Server-Side Reconciliation: Use existing values when not provided by frontend
+    let id_pemesan_num: number | null = existingActivity.id_pemesan ?? null;
     if (id_pemesan) {
-      try {
-        id_pemesan_num = parseInt(id_pemesan);
-        if (isNaN(id_pemesan_num)) {
-          id_pemesan_num = null;
-        }
-      } catch (e) {
-        id_pemesan_num = null;
+      const parsedId = parseInt(id_pemesan);
+      if (!isNaN(parsedId)) {
+        id_pemesan_num = parsedId;
       }
     }
     
-    let id_penerima_manfaat_num: number | null = null;
+    let id_penerima_manfaat_num: number | null = existingActivity.id_penerima_manfaat ?? null;
     if (id_penerima_manfaat) {
-      try {
-        id_penerima_manfaat_num = parseInt(id_penerima_manfaat);
-        if (isNaN(id_penerima_manfaat_num)) {
-          id_penerima_manfaat_num = null;
-        }
-      } catch (e) {
-        id_penerima_manfaat_num = null;
+      const parsedId = parseInt(id_penerima_manfaat);
+      if (!isNaN(parsedId)) {
+        id_penerima_manfaat_num = parsedId;
       }
     }
+
     
-    // For drivers, use their own ID as the driver ID
-    let id_driver_num: number | null = null;
+    // Server-Side Reconciliation: Use existing values when not provided by frontend
+    let id_driver_num: number | null = existingActivity.id_driver ?? null;
     if (session.user.role === "driver") {
       id_driver_num = session.user.id_driver || session.user.id;
     } else {
       // For admins, use the provided driver ID
       if (id_driver) {
         try {
-          id_driver_num = parseInt(id_driver);
-          if (isNaN(id_driver_num)) {
-            id_driver_num = null;
+          const parsedId = parseInt(id_driver);
+          if (!isNaN(parsedId)) {
+            id_driver_num = parsedId;
           }
         } catch (e) {
-          id_driver_num = null;
+          // Keep existing value
         }
       }
     }
@@ -436,31 +435,31 @@ export async function PUT(
           "km_akhir" = ${km_akhir_num},
           "selisih_km" = ${selisih_km},
           "biaya_antar" = ${biaya_antar_num},
-          "biaya_dibayar" = ${biaya_dibayar_num},
-          "nama_pemesan" = ${pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan'},
-          "hp" = ${pemesanData ? pemesanData.hp : '000000000000'},
-          "nama_pm" = ${pmData ? pmData.nama_pm : 'Tanpa PM'},
-          "alamat_pm" = ${pmData ? pmData.alamat_pm : 'Alamat tidak tersedia'},
-          "nik" = ${pmData ? pmData.nik : null},
-          "no_kk" = ${pmData ? pmData.no_kk : null},
-          "tempat_lahir" = ${pmData ? pmData.tempat_lahir : null},
+          "biaya_dibayar" = ${biaya_dibayar_num !== null ? biaya_dibayar_num : existingActivity.biaya_dibayar},
+          "nama_pemesan" = ${pemesanData ? pemesanData.nama_pemesan : (existingActivity.nama_pemesan || 'Tanpa Pemesan')},
+          "hp" = ${pemesanData ? pemesanData.hp : (existingActivity.hp || '000000000000')},
+          "nama_pm" = ${pmData ? pmData.nama_pm : (existingActivity.nama_pm || 'Tanpa PM')},
+          "alamat_pm" = ${pmData ? pmData.alamat_pm : (existingActivity.alamat_pm || 'Alamat tidak tersedia')},
+          "nik" = ${pmData ? pmData.nik : (existingActivity.nik || null)},
+          "no_kk" = ${pmData ? pmData.no_kk : (existingActivity.no_kk || null)},
+          "tempat_lahir" = ${pmData ? pmData.tempat_lahir : (existingActivity.tempat_lahir || null)},
           "tgl_lahir" = ${pmData && pmData.tgl_lahir ? 
             (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
-            null},
-          "jenis_kelamin_pm" = ${pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui'},
+            (existingActivity.tgl_lahir || null)},
+          "jenis_kelamin_pm" = ${pmData ? pmData.jenis_kelamin_pm : (existingActivity.jenis_kelamin_pm || 'Tidak Diketahui')},
           "usia_pm" = ${pmData && pmData.usia_pm !== null ? 
             pmData.usia_pm.toString() : 
-            '0'},
-          "id_asnaf" = ${pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1},
+            (existingActivity.usia_pm?.toString() || '0')},
+          "id_asnaf" = ${pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : (existingActivity.id_asnaf || 1)},
           "status_layanan" = ${status_layanan},
           "pembatalan" = ${pembatalan},
           "keterbatasan" = ${keterbatasan},
-          "infaq" = ${infaq_num},
-          "id_reward" = ${id_reward_num},
-          "agama" = ${pmData ? pmData.agama : null},
-          "status_marital" = ${pmData ? pmData.status_marital : null},
-          "kegiatan" = ${kegiatan || 'pengantaran'},
-          "rumpun_program" = ${rumpun_program || 'kesehatan'}
+          "infaq" = ${infaq_num !== null ? infaq_num : existingActivity.infaq},
+          "id_reward" = ${id_reward_num !== null ? id_reward_num : existingActivity.id_reward},
+          "agama" = ${pmData ? pmData.agama : (existingActivity.agama || null)},
+          "status_marital" = ${pmData ? pmData.status_marital : (existingActivity.status_marital || null)},
+          "kegiatan" = ${kegiatan || existingActivity.kegiatan || 'pengantaran'},
+          "rumpun_program" = ${rumpun_program || existingActivity.rumpun_program || 'kesehatan'}
         WHERE id = ${activityId}
       `
     } catch (dbError: any) {

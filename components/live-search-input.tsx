@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 
 interface LiveSearchInputProps {
   items: Array<{ id: number; [key: string]: any }>
@@ -33,23 +33,30 @@ export default function LiveSearchInput({
   onAutoFill, // New prop for auto-fill functionality
   allowClear = false // New prop to allow clearing the field
 }: LiveSearchInputProps) {
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchTerm, setSearchTerm] = useState(initialValue)
   const [filteredItems, setFilteredItems] = useState<any[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(initialItemId || null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const initializedRef = useRef(false)
 
-  // Initialize the component only once when items are available
+  // Memoize the items array to prevent unnecessary re-renders
+  const memoizedItems = useMemo(() => items, [items])
+  
+  // Create a stable string representation of searchKeys for dependencies
+  const searchKeysString = useMemo(() => searchKeys.join(','), [searchKeys])
+
+  // Initialize the component only once
   useEffect(() => {
-    if (!isInitialized && items.length > 0) {
+    if (!initializedRef.current && memoizedItems.length > 0 && (initialItemId !== undefined || initialValue)) {
+      initializedRef.current = true
+      
       if (initialItemId !== undefined) {
         // Find item by ID first
-        const item = items.find(item => item.id === initialItemId);
+        const item = memoizedItems.find(item => item.id === initialItemId);
         if (item) {
           setSearchTerm(item[displayKey]);
           setSelectedItemId(item.id);
-          setIsInitialized(true);
           return;
         }
       }
@@ -58,7 +65,7 @@ export default function LiveSearchInput({
       if (initialValue) {
         setSearchTerm(initialValue);
         // Try to find matching item by name for ID
-        const matchingItem = items.find(item => 
+        const matchingItem = memoizedItems.find(item => 
           searchKeys.some(key => 
             item[key] && item[key].toString().toLowerCase() === initialValue.toLowerCase()
           )
@@ -67,14 +74,13 @@ export default function LiveSearchInput({
           setSelectedItemId(matchingItem.id);
         }
       }
-      setIsInitialized(true);
     }
-  }, [isInitialized, items, initialItemId, displayKey, searchKeys, initialValue])
+  }, [memoizedItems, initialItemId, displayKey, searchKeysString, initialValue])
 
-  // Filter items based on search term
+  // Filter items based on search term - with proper dependency handling
   useEffect(() => {
     if (searchTerm) {
-      const filtered = items.filter(item => 
+      const filtered = memoizedItems.filter(item => 
         searchKeys.some(key => 
           item[key] && item[key].toString().toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -91,7 +97,7 @@ export default function LiveSearchInput({
       // Only show dropdown when user is actively searching, not based on initial value
       setShowDropdown(false)
     }
-  }, [searchTerm, items, searchKeys, onAutoFill])
+  }, [searchTerm, memoizedItems, searchKeysString, onAutoFill])
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -115,16 +121,16 @@ export default function LiveSearchInput({
   }
 
   // Function to clear the search field
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     setSearchTerm('');
     setSelectedItemId(null);
     // Call onSelect with null to clear the selection in the parent component
     onSelect(null);
     setShowDropdown(false);
-  }
+  }, [onSelect])
 
   // Function to handle manual changes to the search term
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
     
@@ -133,24 +139,24 @@ export default function LiveSearchInput({
       setSelectedItemId(null);
       onSelect(null);
     }
-  }
+  }, [onSelect])
 
   // Function to format item display text
-  const formatItemDisplay = (item: any) => {
+  const formatItemDisplay = useCallback((item: any) => {
     // Special handling for pemesan items to show "nama_pemesan (hp)" format
     if (displayKey === "nama_pemesan" && item.hp) {
       return `${item[displayKey]} (${item.hp})`;
     }
     // For other items or when hp is not available, just show the displayKey value
     return item[displayKey];
-  }
+  }, [displayKey])
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     if (onCreate) {
       onCreate();
     }
     setShowDropdown(false);
-  }
+  }, [onCreate])
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -170,7 +176,7 @@ export default function LiveSearchInput({
               onChange={handleSearchChange}
               onFocus={() => {
                 // Show dropdown when there's a search term or when we have items to show
-                if (searchTerm || items.length > 0) {
+                if (searchTerm || memoizedItems.length > 0) {
                   setShowDropdown(true);
                 }
               }}
@@ -224,7 +230,7 @@ export default function LiveSearchInput({
         {onCreate && (
           <button
             type="button"
-            onClick={onCreate}
+            onClick={handleCreate}
             className="px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
           >
             +

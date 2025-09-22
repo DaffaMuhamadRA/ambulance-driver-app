@@ -329,8 +329,6 @@ export default function EditActivityPage({ params }: { params: { id: string } })
         }))
       }
     }
-    // We intentionally exclude formData.biaya_antar from dependencies to avoid infinite loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.km_awal, formData.km_akhir])
 
   const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -483,7 +481,7 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   // Set selected pemesan and PM after both activity data and reference data are loaded
   useEffect(() => {
     // Only try to set selected pemesan and PM after both activity data and reference data are loaded
-    if (pemesans.length > 0 && penerimaManfaats.length > 0 && activityData) {
+    if (pemesans.length > 0 && penerimaManfaats.length > 0 && activityData && !selectedPemesan && !selectedPM) {
       // Get activity data from form state
       const activityIdPemesan = activityData.id_pemesan;
       const activityIdPM = activityData.id_penerima_manfaat;
@@ -491,65 +489,41 @@ export default function EditActivityPage({ params }: { params: { id: string } })
       // Set selected pemesan if it exists
       if (activityIdPemesan && activityIdPemesan > 0) {
         const pemesan = pemesans.find(p => p.id === activityIdPemesan);
-        if (pemesan) {
+        if (pemesan && (!selectedPemesan || (selectedPemesan as Pemesan)?.id !== pemesan.id)) {
           setSelectedPemesan(pemesan);
-          // Also update formData to ensure consistency
-          setFormData(prev => ({
-            ...prev,
-            id_pemesan: pemesan.id.toString()
-          }));
         }
-      } else {
-        // Clear selected pemesan if no ID is set
-        setSelectedPemesan(null);
       }
       
       // Set selected PM if it exists
       if (activityIdPM && activityIdPM > 0) {
         const pm = penerimaManfaats.find(p => p.id === activityIdPM);
-        if (pm) {
+        if (pm && (!selectedPM || (selectedPM as PenerimaManfaat)?.id !== pm.id)) {
           setSelectedPM(pm);
-          // Also update formData to ensure consistency
-          setFormData(prev => ({
-            ...prev,
-            id_penerima_manfaat: pm.id.toString()
-          }));
         }
-      } else {
-        // Clear selected PM if no ID is set
-        setSelectedPM(null);
       }
     }
-  }, [pemesans, penerimaManfaats, activityData])
+  }, [pemesans.length, penerimaManfaats.length, activityData?.id, selectedPemesan?.id, selectedPM?.id])
 
   // Additional useEffect to handle cases where reference data loads after activity data
   useEffect(() => {
-    if (activityData && (pemesans.length > 0 || penerimaManfaats.length > 0)) {
+    if (activityData && (pemesans.length > 0 || penerimaManfaats.length > 0) && (!selectedPemesan || !selectedPM)) {
       // Update pemesan if needed
-      if (activityData.id_pemesan && activityData.id_pemesan > 0 && pemesans.length > 0) {
+      if (activityData.id_pemesan && activityData.id_pemesan > 0 && pemesans.length > 0 && !selectedPemesan) {
         const pemesan = pemesans.find(p => p.id === activityData.id_pemesan);
-        if (pemesan && !selectedPemesan) {
+        if (pemesan && (!selectedPemesan || (selectedPemesan as Pemesan)?.id !== pemesan.id)) {
           setSelectedPemesan(pemesan);
-          setFormData(prev => ({
-            ...prev,
-            id_pemesan: pemesan.id.toString()
-          }));
         }
       }
       
       // Update PM if needed
-      if (activityData.id_penerima_manfaat && activityData.id_penerima_manfaat > 0 && penerimaManfaats.length > 0) {
+      if (activityData.id_penerima_manfaat && activityData.id_penerima_manfaat > 0 && penerimaManfaats.length > 0 && !selectedPM) {
         const pm = penerimaManfaats.find(p => p.id === activityData.id_penerima_manfaat);
-        if (pm && !selectedPM) {
+        if (pm && (!selectedPM || (selectedPM as PenerimaManfaat)?.id !== pm.id)) {
           setSelectedPM(pm);
-          setFormData(prev => ({
-            ...prev,
-            id_penerima_manfaat: pm.id.toString()
-          }));
         }
       }
     }
-  }, [pemesans, penerimaManfaats, activityData, selectedPemesan, selectedPM])
+  }, [pemesans.length, penerimaManfaats.length, activityData?.id, selectedPemesan?.id, selectedPM?.id])
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -653,7 +627,11 @@ export default function EditActivityPage({ params }: { params: { id: string } })
       setError(err instanceof Error ? err.message : "Gagal memperbarui aktivitas")
       console.error("Form Submission Error:", err)
     } finally {
-      setLoadingData(false)
+      // Only set loading to false if we're not redirecting
+      // This prevents UI flickering during redirect
+      if (error) {
+        setLoadingData(false)
+      }
     }
   }
 
@@ -1038,8 +1016,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
                   placeholder="Cari atau ketik nama pemesan/no HP"
                   displayKey="nama_pemesan"
                   searchKeys={["nama_pemesan", "hp"]}
-                  initialValue={""}
-                  initialItemId={undefined}
+                  initialValue={activityData?.nama_pemesan || ""}
+                  initialItemId={activityData?.id_pemesan || undefined}
                   onCreate={() => setShowCreatePemesan(true)}
                   name="id_pemesan"
                   allowClear={true} // Allow clearing the field
@@ -1082,8 +1060,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
                   placeholder="Cari atau ketik nama PM"
                   displayKey="nama_pm"
                   searchKeys={["nama_pm"]}
-                  initialValue={""}
-                  initialItemId={undefined}
+                  initialValue={activityData?.nama_pm || ""}
+                  initialItemId={activityData?.id_penerima_manfaat || undefined}
                   onCreate={() => setShowCreatePM(true)}
                   name="id_penerima_manfaat"
                   allowClear={true} // Allow clearing the field
