@@ -89,15 +89,20 @@ export default function LiveSearchInput({
       setShowDropdown(true)
       
       // Auto-fill functionality: if there's exactly one match, auto-fill the form
-      if (filtered.length === 1 && onAutoFill) {
-        onAutoFill(filtered[0]);
+      // Only auto-fill if this is user-initiated search, not during initialization
+      if (filtered.length === 1 && onAutoFill && initializedRef.current) {
+        // Add a check to prevent calling onAutoFill with the same item repeatedly
+        const currentItem = filtered[0];
+        if (selectedItemId !== currentItem.id) {
+          onAutoFill(currentItem);
+        }
       }
     } else {
       setFilteredItems([])
       // Only show dropdown when user is actively searching, not based on initial value
       setShowDropdown(false)
     }
-  }, [searchTerm, memoizedItems, searchKeysString, onAutoFill])
+  }, [searchTerm, memoizedItems, searchKeysString, onAutoFill, selectedItemId])
 
   // Handle click outside to close dropdown
   useEffect(() => {
