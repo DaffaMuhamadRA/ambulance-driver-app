@@ -19,6 +19,15 @@ export function useAuth() {
     const fetchUser = async () => {
       try {
         const response = await fetch(`${BASE_URL}/api/auth/session`)
+        
+        // Check if the response is successful
+        if (!response.ok) {
+          console.error("Failed to fetch user session:", response.status, response.statusText)
+          setUser(null)
+          setLoading(false)
+          return
+        }
+        
         const data = await response.json()
         setUser(data.user)
       } catch (error) {

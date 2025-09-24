@@ -68,18 +68,30 @@ export async function GET() {
     const cookieStore = await cookies()
     const sessionToken = cookieStore.get("session")?.value
 
-    if (!sessionToken) return NextResponse.json({ user: null })
+    // If no session token, return null user (not an error)
+    if (!sessionToken) {
+      return NextResponse.json({ user: null })
+    }
 
     // Validate token
     const sanitizedToken = validateStringInput(sessionToken, 255, 1);
     if (!sanitizedToken) {
+      // Invalid token format, return null user
       return NextResponse.json({ user: null })
     }
 
     const session = await getSession(sanitizedToken)
-    return NextResponse.json({ user: session?.user || null })
+    
+    // If session is invalid or expired, return null user
+    if (!session) {
+      return NextResponse.json({ user: null })
+    }
+    
+    // Valid session, return user
+    return NextResponse.json({ user: session.user })
   } catch (error) {
     console.error("Error getting current user:", error)
+    // In case of server error, return null user (not authenticated)
     return NextResponse.json({ user: null })
   }
 }
