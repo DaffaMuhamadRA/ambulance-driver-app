@@ -104,6 +104,11 @@ export default function AdminPage() {
     }
   }
 
+  // Function to refresh activities data
+  const refreshActivities = () => {
+    fetchAdminActivities()
+  }
+
   if (loading || activitiesLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -150,6 +155,8 @@ export default function AdminPage() {
         <ActivitiesTable 
           activities={activities} 
           initialPage={initialPage}
+          isAdmin={true}
+          onRefresh={refreshActivities}
         />
       </div>
     </DashboardLayout>

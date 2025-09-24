@@ -12,6 +12,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import ConfirmationModal from "@/components/confirmation-modal"
+import AlertModal from "@/components/alert-modal"
 
 interface ActivitiesGridProps {
   activities: Activity[]
@@ -28,6 +30,13 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [searchTerm, setSearchTerm] = useState("")
   const [currentActivities, setCurrentActivities] = useState<Activity[]>(activities)
+  // Modal states
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [alertModalOpen, setAlertModalOpen] = useState(false)
+  const [alertModalTitle, setAlertModalTitle] = useState("")
+  const [alertModalMessage, setAlertModalMessage] = useState("")
+  const [alertModalType, setAlertModalType] = useState<"info" | "success" | "warning" | "error">("info")
+  const [deleteAction, setDeleteAction] = useState<() => void>(() => () => {})
   const gridRef = useRef<HTMLDivElement>(null)
 
   // Filter activities based on search term
@@ -98,75 +107,97 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
   }
 
   const handleDelete = async (activityId: number) => {
-    // Show confirmation popup
-    if (confirm("Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan.")) {
-      try {
-        // Determine which API endpoint to use based on isAdmin flag
-        const apiEndpoint = isAdmin ? `/api/admin/activities/${activityId}` : `/api/activities/${activityId}`
+    // Show confirmation modal instead of confirm()
+    setDeleteAction(() => () => performDelete(activityId))
+    setConfirmModalOpen(true)
+  }
+
+  const performDelete = async (activityId: number) => {
+    try {
+      // Determine which API endpoint to use based on isAdmin flag
+      const apiEndpoint = isAdmin ? `/api/admin/activities/${activityId}` : `/api/activities/${activityId}`
+      
+      const response = await fetch(apiEndpoint, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        // Remove the deleted activity from the current activities list
+        setCurrentActivities(prevActivities => 
+          prevActivities.filter(activity => activity.id !== activityId)
+        )
         
-        const response = await fetch(apiEndpoint, {
-          method: 'DELETE',
-        })
-        
-        if (response.ok) {
-          // Remove the deleted activity from the current activities list
-          setCurrentActivities(prevActivities => 
-            prevActivities.filter(activity => activity.id !== activityId)
-          )
-          
-          // Reset to first page if we're on an empty page
-          if (displayedActivities.length === 1 && currentPage > 1) {
-            setCurrentPage(1)
-          }
-        } else {
-          const errorData = await response.json()
-          alert(`Gagal menghapus aktivitas: ${errorData.error}`)
+        // Reset to first page if we're on an empty page
+        if (displayedActivities.length === 1 && currentPage > 1) {
+          setCurrentPage(1)
         }
-      } catch (error) {
-        console.error("Error deleting activity:", error)
-        alert("Terjadi kesalahan saat menghapus aktivitas")
+      } else {
+        const errorData = await response.json()
+        // Show alert modal instead of alert()
+        setAlertModalTitle("Gagal Menghapus")
+        setAlertModalMessage(`Gagal menghapus aktivitas: ${errorData.error}`)
+        setAlertModalType("error")
+        setAlertModalOpen(true)
       }
+    } catch (error) {
+      console.error("Error deleting activity:", error)
+      // Show alert modal instead of alert()
+      setAlertModalTitle("Kesalahan")
+      setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas")
+      setAlertModalType("error")
+      setAlertModalOpen(true)
     }
   }
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     
-    // Show confirmation popup
-    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.size} aktivitas? Tindakan ini tidak dapat dibatalkan.`)) {
-      try {
-        // Delete each selected activity
-        const deletePromises = Array.from(selectedIds).map(id => {
-          const apiEndpoint = isAdmin ? `/api/admin/activities/${id}` : `/api/activities/${id}`;
-          return fetch(apiEndpoint, {
-            method: 'DELETE',
-          });
+    // Show confirmation modal instead of confirm()
+    setDeleteAction(() => performBulkDelete)
+    setConfirmModalOpen(true)
+  };
+
+  const performBulkDelete = async () => {
+    try {
+      // Delete each selected activity
+      const deletePromises = Array.from(selectedIds).map(id => {
+        const apiEndpoint = isAdmin ? `/api/admin/activities/${id}` : `/api/activities/${id}`;
+        return fetch(apiEndpoint, {
+          method: 'DELETE',
         });
+      });
+      
+      const responses = await Promise.all(deletePromises);
+      const failedDeletes = responses.filter(response => !response.ok);
+      
+      if (failedDeletes.length === 0) {
+        // All deletions successful
+        // Remove the deleted activities from the current activities list
+        setCurrentActivities(prevActivities => 
+          prevActivities.filter(activity => !selectedIds.has(activity.id))
+        );
         
-        const responses = await Promise.all(deletePromises);
-        const failedDeletes = responses.filter(response => !response.ok);
+        // Clear selection
+        setSelectedIds(new Set());
         
-        if (failedDeletes.length === 0) {
-          // All deletions successful
-          // Remove the deleted activities from the current activities list
-          setCurrentActivities(prevActivities => 
-            prevActivities.filter(activity => !selectedIds.has(activity.id))
-          );
-          
-          // Clear selection
-          setSelectedIds(new Set());
-          
-          // Reset to first page if we're on an empty page
-          if (displayedActivities.length === selectedIds.size && currentPage > 1) {
-            setCurrentPage(1);
-          }
-        } else {
-          alert(`Gagal menghapus ${failedDeletes.length} dari ${selectedIds.size} aktivitas.`);
+        // Reset to first page if we're on an empty page
+        if (displayedActivities.length === selectedIds.size && currentPage > 1) {
+          setCurrentPage(1);
         }
-      } catch (error) {
-        console.error("Error deleting activities:", error);
-        alert("Terjadi kesalahan saat menghapus aktivitas");
+      } else {
+        // Show alert modal instead of alert()
+        setAlertModalTitle("Gagal Menghapus")
+        setAlertModalMessage(`Gagal menghapus ${failedDeletes.length} dari ${selectedIds.size} aktivitas.`);
+        setAlertModalType("error")
+        setAlertModalOpen(true)
       }
+    } catch (error) {
+      console.error("Error deleting activities:", error);
+      // Show alert modal instead of alert()
+      setAlertModalTitle("Kesalahan")
+      setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas");
+      setAlertModalType("error")
+      setAlertModalOpen(true)
     }
   };
 
@@ -490,6 +521,29 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
           </Button>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModalOpen}
+        onClose={() => setConfirmModalOpen(false)}
+        onConfirm={deleteAction}
+        title="Konfirmasi Hapus"
+        message={selectedIds.size > 1 
+          ? `Apakah Anda yakin ingin menghapus ${selectedIds.size} aktivitas? Tindakan ini tidak dapat dibatalkan.` 
+          : "Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan."}
+        confirmText="Ya"
+        cancelText="Batal"
+        confirmButtonClass="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModalOpen}
+        onClose={() => setAlertModalOpen(false)}
+        title={alertModalTitle}
+        message={alertModalMessage}
+        type={alertModalType}
+      />
     </div>
   )
 }

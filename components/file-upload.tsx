@@ -5,6 +5,7 @@ import type React from "react"
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { X, Upload, File, ImageIcon } from "lucide-react"
+import AlertModal from "@/components/alert-modal"
 
 interface FileUploadProps {
   onFilesChange: (files: File[]) => void
@@ -19,6 +20,9 @@ export default function FileUpload({
 }: FileUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [dragActive, setDragActive] = useState(false)
+  const [alertModalOpen, setAlertModalOpen] = useState(false)
+  const [alertModalTitle, setAlertModalTitle] = useState("")
+  const [alertModalMessage, setAlertModalMessage] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFiles = (files: FileList | null) => {
@@ -28,7 +32,10 @@ export default function FileUpload({
     const totalFiles = selectedFiles.length + newFiles.length
 
     if (totalFiles > maxFiles) {
-      alert(`Maksimal ${maxFiles} file yang dapat diupload`)
+      // Show alert modal instead of alert()
+      setAlertModalTitle("Batas Maksimal File")
+      setAlertModalMessage(`Maksimal ${maxFiles} file yang dapat diupload`)
+      setAlertModalOpen(true)
       return
     }
 
@@ -129,6 +136,15 @@ export default function FileUpload({
           ))}
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModalOpen}
+        onClose={() => setAlertModalOpen(false)}
+        title={alertModalTitle}
+        message={alertModalMessage}
+        type="warning"
+      />
     </div>
   )
 }

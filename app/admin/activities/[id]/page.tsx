@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/useAuth"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import DashboardLayout from "@/components/dashboard-layout"
+import ConfirmationModal from "@/components/confirmation-modal"
+import AlertModal from "@/components/alert-modal"
 
 interface Activity {
   id: number
@@ -59,6 +61,12 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
   const [activity, setActivity] = useState<Activity | null>(null)
   const [loadingActivity, setLoadingActivity] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Modal states
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [alertModalOpen, setAlertModalOpen] = useState(false)
+  const [alertModalTitle, setAlertModalTitle] = useState("")
+  const [alertModalMessage, setAlertModalMessage] = useState("")
+  const [alertModalType, setAlertModalType] = useState<"info" | "success" | "warning" | "error">("info")
   
   const activityId = parseInt(params.id)
   const page = searchParams.get('page')
@@ -124,23 +132,33 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
   }
 
   const handleDelete = async () => {
-    // Show confirmation popup
-    if (confirm("Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan.")) {
-      try {
-        const response = await fetch(`/api/admin/activities/${activityId}`, {
-          method: 'DELETE',
-        });
-        
-        if (response.ok) {
-          router.push('/admin');
-        } else {
-          const errorData = await response.json();
-          alert(`Gagal menghapus aktivitas: ${errorData.error}`);
-        }
-      } catch (error) {
-        console.error("Error deleting activity:", error);
-        alert("Terjadi kesalahan saat menghapus aktivitas");
+    // Show confirmation modal instead of confirm()
+    setConfirmModalOpen(true)
+  }
+
+  const performDelete = async () => {
+    try {
+      const response = await fetch(`/api/admin/activities/${activityId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        router.push('/admin');
+      } else {
+        const errorData = await response.json();
+        // Show alert modal instead of alert()
+        setAlertModalTitle("Gagal Menghapus")
+        setAlertModalMessage(`Gagal menghapus aktivitas: ${errorData.error}`);
+        setAlertModalType("error")
+        setAlertModalOpen(true)
       }
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+      // Show alert modal instead of alert()
+      setAlertModalTitle("Kesalahan")
+      setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas");
+      setAlertModalType("error")
+      setAlertModalOpen(true)
     }
   }
 
@@ -220,7 +238,8 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Informasi Aktivitas</h2>
-              <div className="flex gap-2">
+              {/* Desktop action buttons - hidden on mobile */}
+              <div className="hidden md:flex gap-2">
                 <Link href={`/admin/activities/${activityId}/edit`}>
                   <Button variant="outline" className="flex items-center gap-2">
                     <svg
@@ -267,7 +286,7 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
                 <Button 
                   variant="outline" 
                   className="flex items-center gap-2"
-                  onClick={handleBack} // Use handleBack instead of direct navigation
+                  onClick={handleBack}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -475,9 +494,101 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
                 </div>
               </div>
             </div>
+
+            {/* Mobile action buttons - visible only on mobile and placed below the information */}
+            <div className="mt-8 pt-6 border-t border-gray-200 md:hidden">
+              <div className="flex flex-col gap-3">
+                <Link href={`/admin/activities/${activityId}/edit`}>
+                  <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Edit
+                  </Button>
+                </Link>
+                <Button 
+                  variant="outline" 
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={handleDelete}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
+                  Hapus
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={handleBack}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="m12 19-7-7 7-7" />
+                    <path d="M19 12H5" />
+                  </svg>
+                  Kembali
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+      
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModalOpen}
+        onClose={() => setConfirmModalOpen(false)}
+        onConfirm={performDelete}
+        title="Konfirmasi Hapus"
+        message="Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan."
+        confirmText="Ya"
+        cancelText="Batal"
+        confirmButtonClass="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModalOpen}
+        onClose={() => setAlertModalOpen(false)}
+        title={alertModalTitle}
+        message={alertModalMessage}
+        type={alertModalType}
+      />
     </DashboardLayout>
   )
 }

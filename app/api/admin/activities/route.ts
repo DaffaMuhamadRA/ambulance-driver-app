@@ -5,6 +5,116 @@ import { sql } from "@/lib/db"
 import { put } from '@vercel/blob'
 import { sanitizeInput, validateNumericInput, validateDateInput, validateTimeInput, validateStringInput } from "@/lib/validation"
 
+// Add GET method to fetch activities for admin dashboard
+export async function GET(request: Request) {
+  try {
+    // Get session from cookies
+    const cookieHeader = request.headers.get("cookie") || ""
+    const sessionCookie = cookieHeader
+      .split("; ")
+      .find((cookie) => cookie.startsWith("session="))
+    
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+    
+    const sessionToken = sessionCookie.split("=")[1]
+    const session = await getSession(sessionToken)
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+    
+    // Check if user is admin
+    if (session.user.role !== "admin") {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      )
+    }
+    
+    // Fetch all activities with related data
+    const result = await sql`
+      SELECT 
+        aa.id,
+        aa.tgl as tgl_berangkat,
+        aa.tgl_pulang,
+        aa.dari,
+        aa.tujuan,
+        aa.jam_berangkat,
+        aa.jam_pulang,
+        aa.area,
+        aa.asisten_luar_kota,
+        aa.km_awal,
+        aa.km_akhir,
+        aa.nama_pemesan,
+        aa.hp,
+        aa.nama_pm,
+        aa.alamat_pm,
+        aa.jenis_kelamin_pm,
+        aa.usia_pm,
+        aa.nik,
+        aa.no_kk,
+        aa.tempat_lahir,
+        aa.tgl_lahir,
+        aa.status_marital,
+        aa.kegiatan,
+        aa.rumpun_program,
+        aa.infaq,
+        aa.biaya_dibayar,
+        aa.id_asnaf,
+        da.detail_antar as detail,
+        rp.jenis,
+        rp.tipe,
+        rp.reward,
+        a.id as ambulance_id,
+        a.nopol as ambulance_nopol,
+        '' as ambulance_kode,
+        cu.id as user_id,
+        cu.name as user_name
+      FROM ambulan_activity aa
+      LEFT JOIN detail_antar da ON aa.id_detail = da.id
+      LEFT JOIN reward_pengantaran rp ON aa.id_reward = rp.id
+      LEFT JOIN ambulan a ON aa.id_ambulan = a.id
+      LEFT JOIN cms_users cu ON aa.id_driver = cu.id
+      ORDER BY aa.tgl DESC, aa.jam_berangkat DESC
+      LIMIT 100
+    `
+    
+    // Transform the flat result into nested objects
+    const activities = result.map((row: any) => ({
+      ...row,
+      ambulance: {
+        id: row.ambulance_id,
+        nopol: row.ambulance_nopol,
+        kode: row.ambulance_kode
+      },
+      user: {
+        id: row.user_id,
+        name: row.user_name
+      }
+    })).map((activity: any) => {
+      // Remove the temporary fields
+      const { ambulance_id, ambulance_nopol, ambulance_kode, user_id, user_name, ...rest } = activity
+      return rest
+    })
+    
+    return NextResponse.json(activities)
+  } catch (error: any) {
+    console.error("Error fetching activities:", error)
+    return NextResponse.json(
+      { error: "Internal server error", details: error.message },
+      { status: 500 }
+    )
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // Get session from cookies

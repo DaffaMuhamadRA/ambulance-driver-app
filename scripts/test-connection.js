@@ -82,6 +82,34 @@ async function testConnection() {
       console.log(`  - ${col.column_name}`);
     });
     
+    // Test querying detail_antar table
+    console.log('\nTesting detail_antar table access...');
+    const detailColumns = await sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'detail_antar'
+      ORDER BY ordinal_position
+    `;
+    
+    console.log('Columns in detail_antar table:');
+    detailColumns.forEach(col => {
+      console.log(`  - ${col.column_name}`);
+    });
+    
+    // Test querying reward_pengantaran table
+    console.log('\nTesting reward_pengantaran table access...');
+    const rewardColumns = await sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'reward_pengantaran'
+      ORDER BY ordinal_position
+    `;
+    
+    console.log('Columns in reward_pengantaran table:');
+    rewardColumns.forEach(col => {
+      console.log(`  - ${col.column_name}`);
+    });
+    
     return true;
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);

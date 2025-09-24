@@ -9,6 +9,7 @@ import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import LiveSearchInput from "@/components/live-search-input"
 import FileUpload from "@/components/file-upload"
+import AlertModal from "@/components/alert-modal"
 
 // Interface definitions
 interface Kantor {
@@ -138,6 +139,12 @@ export default function CreateActivityPage() {
   const [documentationFiles, setDocumentationFiles] = useState<File[]>([])
   const [uploadingFiles, setUploadingFiles] = useState(false)
 
+  // Alert modal states
+  const [alertModalOpen, setAlertModalOpen] = useState(false)
+  const [alertModalTitle, setAlertModalTitle] = useState("")
+  const [alertModalMessage, setAlertModalMessage] = useState("")
+  const [alertModalType, setAlertModalType] = useState<"info" | "success" | "warning" | "error">("info")
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!loading && !user) {
@@ -228,7 +235,7 @@ export default function CreateActivityPage() {
     const kmAwal = parseInt(formData.km_awal) || 0
     const kmAkhir = parseInt(formData.km_akhir) || 0
     
-    // Only calculate if both values are valid and km_akhir >= km_awal
+    // Only calculate if both values are valid and km_akhir >= kmAwal
     if (kmAwal >= 0 && kmAkhir >= 0 && kmAkhir >= kmAwal) {
       const biaya = (kmAkhir - kmAwal) * 6000  // Changed from 3000 to 6000 Rupiah per kilometer
       // Only update if the calculated value is different to prevent infinite loop
@@ -506,13 +513,20 @@ export default function CreateActivityPage() {
         setUploadingFiles(false)
       }
 
-      alert("Aktivitas berhasil dibuat!")
+      // Show alert modal instead of alert()
+      setAlertModalTitle("Berhasil")
+      setAlertModalMessage("Aktivitas berhasil dibuat!")
+      setAlertModalType("success")
+      setAlertModalOpen(true)
 
-      if (user?.role === "admin") {
-        router.push("/admin")
-      } else {
-        router.push("/dashboard")
-      }
+      // Redirect after a short delay to allow user to see the success message
+      setTimeout(() => {
+        if (user?.role === "admin") {
+          router.push("/admin")
+        } else {
+          router.push("/dashboard")
+        }
+      }, 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal membuat aktivitas")
       console.error("Form Submission Error:", err)
@@ -1106,7 +1120,7 @@ export default function CreateActivityPage() {
                   onClick={() => setShowCreatePemesan(false)}
                   className="text-gray-400 hover:text-gray-500 text-2xl font-bold"
                 >
-                  &times;
+                  ×
                 </button>
               </div>
               <form onSubmit={handleCreatePemesan}>
@@ -1168,7 +1182,7 @@ export default function CreateActivityPage() {
                   onClick={() => setShowCreatePM(false)}
                   className="text-gray-400 hover:text-gray-500 text-2xl font-bold"
                 >
-                  &times;
+                  ×
                 </button>
               </div>
               <form onSubmit={handleCreatePM}>
@@ -1307,6 +1321,25 @@ export default function CreateActivityPage() {
           </div>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModalOpen}
+        onClose={() => {
+          setAlertModalOpen(false)
+          // Redirect after closing the modal if it was a success
+          if (alertModalType === "success") {
+            if (user?.role === "admin") {
+              router.push("/admin")
+            } else {
+              router.push("/dashboard")
+            }
+          }
+        }}
+        title={alertModalTitle}
+        message={alertModalMessage}
+        type={alertModalType}
+      />
     </DashboardLayout>
   )
 }

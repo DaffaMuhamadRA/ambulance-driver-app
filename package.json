@@ -17,12 +17,12 @@
     "db:list-ambulances": "node scripts/manage-ambulances.js list",
     "db:list-driver-activities": "node scripts/manage-activities.js driver",
     "db:list-sessions": "node scripts/manage-sessions.js list",
-    "db:list-users": "node scripts/manage-users.js list",
     "db:test-connection": "node scripts/test-connection.js",
     "db:update-ambulance-status": "node scripts/manage-ambulances.js update-status",
     "db:verify-password": "node scripts/manage-users.js verify",
     "dev": "next dev",
     "lint": "next lint",
+    "sessions:clean-expired": "npx tsx scripts/clean-expired-sessions.ts",
     "start": "next start",
     "test:base-url": "node scripts/test-base-url.js"
   },

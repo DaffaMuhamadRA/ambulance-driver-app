@@ -29,7 +29,8 @@ function generateSessionToken(): string {
 // Create a new session
 export async function createSession(userId: number): Promise<string> {
   const sessionToken = generateSessionToken();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  // Set expiration to 2 days instead of 7 days
+  const expiresAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000); // 2 days
 
   try {
     await sql`
@@ -115,6 +116,7 @@ export async function deleteSession(token: string): Promise<void> {
 // Clean expired sessions
 export async function cleanExpiredSessions(): Promise<void> {
   try {
+    // This function properly deletes expired sessions from the database
     await sql`DELETE FROM sessions WHERE expires_at < NOW()`;
   } catch (error) {
     console.error("Error cleaning expired sessions:", error);

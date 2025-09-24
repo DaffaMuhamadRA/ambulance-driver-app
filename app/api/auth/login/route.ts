@@ -21,16 +21,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Username atau password salah" }, { status: 401 });
     }
 
-    // Create session
+    // Create session with 2-day expiration
     const sessionToken = await createSession(user.id);
 
-    // Set cookie
+    // Set cookie with 2-day maxAge
     const cookieStore = await cookies();
     cookieStore.set("session", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 2 * 24 * 60 * 60, // 2 days in seconds
       path: "/",
     });
 

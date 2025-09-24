@@ -6,20 +6,34 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import ConfirmationModal from "@/components/confirmation-modal"
+import AlertModal from "@/components/alert-modal"
 
 interface ActivitiesTableProps {
   activities: Activity[]
   isAdmin?: boolean
   onAddNew?: () => void
   initialPage?: number
+  onRefresh?: () => void
 }
 
-export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, initialPage = 1 }: ActivitiesTableProps) {
+export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, initialPage = 1, onRefresh }: ActivitiesTableProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [currentPage, setCurrentPage] = useState(initialPage)
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedActivities, setSelectedActivities] = useState<number[]>([])
+  const [bulkActionsOpen, setBulkActionsOpen] = useState(false)
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [alertModalOpen, setAlertModalOpen] = useState(false)
+  const [modalAction, setModalAction] = useState<() => void>(() => () => {})
+  const [modalTitle, setModalTitle] = useState("")
+  const [modalMessage, setModalMessage] = useState("")
+  const [alertModalTitle, setAlertModalTitle] = useState("")
+  const [alertModalMessage, setAlertModalMessage] = useState("")
+  const [alertModalType, setAlertModalType] = useState<"info" | "success" | "warning" | "error">("info")
+  const bulkActionsRef = useRef<HTMLDivElement>(null)
   const tableRef = useRef<HTMLDivElement>(null)
 
   // Filter activities based on search term
@@ -35,6 +49,20 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
   const totalPages = Math.ceil(filteredActivities.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const currentActivities = filteredActivities.slice(startIndex, startIndex + itemsPerPage)
+
+  // Close bulk actions dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (bulkActionsRef.current && !bulkActionsRef.current.contains(event.target as Node)) {
+        setBulkActionsOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   // Scroll to top when currentPage changes
   useEffect(() => {
@@ -83,25 +111,102 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
   }
 
   const handleDelete = async (activityId: number) => {
-    // Show confirmation popup
-    if (confirm("Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan.")) {
-      try {
-        // For admin dashboard, always use admin API endpoint
-        const response = await fetch(`/api/admin/activities/${activityId}`, {
-          method: 'DELETE',
-        })
-        
-        if (response.ok) {
-          // Refresh the page to show updated data
-          router.refresh()
+    // Show confirmation modal
+    setModalTitle("Konfirmasi Hapus")
+    setModalMessage("Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan.")
+    setModalAction(() => () => performDelete(activityId))
+    setConfirmModalOpen(true)
+  }
+
+  const performDelete = async (activityId: number) => {
+    try {
+      // For admin dashboard, always use admin API endpoint
+      const response = await fetch(`/api/admin/activities/${activityId}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        // Refresh the data
+        if (onRefresh) {
+          onRefresh()
         } else {
-          const errorData = await response.json()
-          alert(`Gagal menghapus aktivitas: ${errorData.error}`)
+          router.refresh()
         }
-      } catch (error) {
-        console.error("Error deleting activity:", error)
-        alert("Terjadi kesalahan saat menghapus aktivitas")
+      } else {
+        const errorData = await response.json()
+        setAlertModalTitle("Gagal Menghapus")
+        setAlertModalMessage(`Gagal menghapus aktivitas: ${errorData.error}`)
+        setAlertModalType("error")
+        setAlertModalOpen(true)
       }
+    } catch (error) {
+      console.error("Error deleting activity:", error)
+      setAlertModalTitle("Kesalahan")
+      setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas")
+      setAlertModalType("error")
+      setAlertModalOpen(true)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedActivities.length === 0) return
+
+    // Show confirmation modal
+    setModalTitle("Konfirmasi Hapus Massal")
+    setModalMessage(`Apakah Anda yakin ingin menghapus ${selectedActivities.length} aktivitas? Tindakan ini tidak dapat dibatalkan.`)
+    setModalAction(() => performBulkDelete)
+    setConfirmModalOpen(true)
+  }
+
+  const performBulkDelete = async () => {
+    try {
+      const response = await fetch(`/api/admin/activities/bulk`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: selectedActivities }),
+      })
+      
+      if (response.ok) {
+        // Clear selection and refresh the data
+        setSelectedActivities([])
+        if (onRefresh) {
+          onRefresh()
+        } else {
+          router.refresh()
+        }
+      } else {
+        const errorData = await response.json()
+        setAlertModalTitle("Gagal Menghapus")
+        setAlertModalMessage(`Gagal menghapus aktivitas: ${errorData.error}`)
+        setAlertModalType("error")
+        setAlertModalOpen(true)
+      }
+    } catch (error) {
+      console.error("Error deleting activities:", error)
+      setAlertModalTitle("Kesalahan")
+      setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas")
+      setAlertModalType("error")
+      setAlertModalOpen(true)
+    }
+  }
+
+  const handleSelectAll = () => {
+    if (selectedActivities.length === currentActivities.length) {
+      // If all are selected, deselect all
+      setSelectedActivities([])
+    } else {
+      // Select all current page activities
+      setSelectedActivities(currentActivities.map(activity => activity.id))
+    }
+  }
+
+  const handleSelectActivity = (activityId: number) => {
+    if (selectedActivities.includes(activityId)) {
+      setSelectedActivities(selectedActivities.filter(id => id !== activityId))
+    } else {
+      setSelectedActivities([...selectedActivities, activityId])
     }
   }
 
@@ -163,6 +268,36 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedActivities.length > 0 && (
+        <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+          <div className="text-sm text-blue-800">
+            {selectedActivities.length} aktivitas dipilih
+          </div>
+          <div className="relative" ref={bulkActionsRef}>
+            <button
+              onClick={() => setBulkActionsOpen(!bulkActionsOpen)}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Tindakan Massal
+            </button>
+            
+            {bulkActionsOpen && (
+              <div className="absolute top-full left-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                <div className="py-1">
+                  <button
+                    onClick={handleBulkDelete}
+                    className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                  >
+                    Hapus yang Dipilih
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Pagination controls above the table - visible only on mobile */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center py-4 border-t border-b border-gray-200 space-x-4 text-sm sm:hidden">
@@ -220,6 +355,14 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">
+                <input
+                  type="checkbox"
+                  checked={selectedActivities.length > 0 && selectedActivities.length === currentActivities.length}
+                  onChange={handleSelectAll}
+                  className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+              </th>
               <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                 Tanggal
               </th>
@@ -258,15 +401,24 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
           <tbody className="bg-white divide-y divide-gray-200">
             {currentActivities.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-4 text-center text-sm text-gray-500">
+                <td colSpan={12} className="px-4 py-4 text-center text-sm text-gray-500">
                   Tidak ada aktivitas yang ditemukan.
                 </td>
               </tr>
             ) : (
               currentActivities.map((activity) => {
                 const styles = getDetailStyles(activity.detail)
+                const isSelected = selectedActivities.includes(activity.id)
                 return (
-                  <tr key={activity.id} className="hover:bg-gray-50">
+                  <tr key={activity.id} className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
+                    <td className="px-4 py-4 text-sm text-gray-900 w-8">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleSelectActivity(activity.id)}
+                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                      />
+                    </td>
                     <td className="px-4 py-4 text-sm text-gray-900 w-24">
                       <div className="truncate" title={formatDate(activity.tgl_berangkat)}>
                         {formatDate(activity.tgl_berangkat)}
@@ -429,6 +581,26 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
           </Button>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModalOpen}
+        onClose={() => setConfirmModalOpen(false)}
+        onConfirm={modalAction}
+        title={modalTitle}
+        message={modalMessage}
+        confirmText="Ya"
+        cancelText="Batal"
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModalOpen}
+        onClose={() => setAlertModalOpen(false)}
+        title={alertModalTitle}
+        message={alertModalMessage}
+        type={alertModalType}
+      />
     </div>
   )
 }
