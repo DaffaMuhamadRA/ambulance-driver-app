@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { notFound, useRouter } from "next/navigation"
+import { notFound, useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -54,12 +54,14 @@ interface Activity {
 
 export default function ActivityDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading } = useAuth()
   const [activity, setActivity] = useState<Activity | null>(null)
   const [loadingActivity, setLoadingActivity] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
   const activityId = parseInt(params.id)
+  const page = searchParams.get('page') // Get the page parameter from URL
   
   useEffect(() => {
     if (isNaN(activityId)) {
@@ -119,6 +121,38 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
   const formatTime = (timeString: string) => {
     if (!timeString) return "-"
     return timeString.slice(0, 5) // Remove seconds
+  }
+
+  const handleDelete = async () => {
+    // Show confirmation popup
+    if (confirm("Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan.")) {
+      try {
+        const response = await fetch(`/api/activities/${activityId}`, {
+          method: 'DELETE',
+        })
+        
+        if (response.ok) {
+          // Redirect to dashboard after successful deletion
+          router.push('/dashboard')
+        } else {
+          const errorData = await response.json()
+          alert(`Gagal menghapus aktivitas: ${errorData.error}`)
+        }
+      } catch (error) {
+        console.error("Error deleting activity:", error)
+        alert("Terjadi kesalahan saat menghapus aktivitas")
+      }
+    }
+  }
+
+  const handleBack = () => {
+    // If we have a page parameter, go back to that specific page
+    if (page) {
+      router.push(`/dashboard?page=${page}`)
+    } else {
+      // Fallback to dashboard if no page parameter
+      router.push('/dashboard')
+    }
   }
 
   if (loading || loadingActivity) {
@@ -207,26 +241,51 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                     Edit
                   </Button>
                 </Link>
-                <Link href="/dashboard">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4"
-                    >
-                      <path d="m12 19-7-7 7-7" />
-                      <path d="M19 12H5" />
-                    </svg>
-                    Kembali
-                  </Button>
-                </Link>
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={handleDelete}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
+                  Hapus
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={handleBack} // Use handleBack instead of Link
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="m12 19-7-7 7-7" />
+                    <path d="M19 12H5" />
+                  </svg>
+                  Kembali
+                </Button>
               </div>
             </div>
 

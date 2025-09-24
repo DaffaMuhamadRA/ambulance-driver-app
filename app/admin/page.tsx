@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import DashboardLayout from "@/components/dashboard-layout"
 import ActivitiesTable from "@/components/activities-table"
@@ -53,9 +53,11 @@ interface Activity {
 
 export default function AdminPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading } = useAuth()
   const [activities, setActivities] = useState<Activity[]>([])
   const [activitiesLoading, setActivitiesLoading] = useState(true)
+  const [initialPage, setInitialPage] = useState(1)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -73,6 +75,17 @@ export default function AdminPage() {
       fetchAdminActivities()
     }
   }, [user, loading])
+
+  // Get the page parameter from URL on initial load
+  useEffect(() => {
+    const pageParam = searchParams.get('page')
+    if (pageParam) {
+      const pageNum = parseInt(pageParam, 10)
+      if (!isNaN(pageNum) && pageNum > 0) {
+        setInitialPage(pageNum)
+      }
+    }
+  }, [searchParams])
 
   const fetchAdminActivities = async () => {
     try {
@@ -136,6 +149,7 @@ export default function AdminPage() {
       <div className="mt-6">
         <ActivitiesTable 
           activities={activities} 
+          initialPage={initialPage}
         />
       </div>
     </DashboardLayout>

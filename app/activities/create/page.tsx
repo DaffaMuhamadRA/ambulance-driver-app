@@ -101,10 +101,10 @@ export default function CreateActivityPage() {
     km_awal: "",
     km_akhir: "",
     biaya_antar: "0", // This will be automatically calculated
-    biaya_dibayar: "0", // Default value
+    biaya_dibayar: "", // Allow empty value
     id_pemesan: "",
     id_penerima_manfaat: "",
-    infaq: "0", // Default value
+    infaq: "", // Allow empty value
     id_reward: "",
     kegiatan: "pengantaran",
     rumpun_program: "kesehatan",
@@ -407,7 +407,7 @@ export default function CreateActivityPage() {
         km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
         biaya_antar: formData.biaya_antar ? parseInt(formData.biaya_antar) : 0,
         biaya_dibayar: formData.biaya_dibayar ? parseInt(formData.biaya_dibayar) : 0,
-        infaq: formData.infaq ? parseInt(formData.infaq) : 0,
+        infaq: formData.infaq !== "" ? parseInt(formData.infaq) : null,
         id_reward: formData.id_reward ? parseInt(formData.id_reward) : null,
         id_kantor: formData.id_kantor ? parseInt(formData.id_kantor) : null,
         id_ambulan: formData.id_ambulan ? parseInt(formData.id_ambulan) : null,

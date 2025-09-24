@@ -3,95 +3,10 @@ import { getSession } from "@/app/api/auth/session/route"
 import { getActivityById, getActivityByIdWithReferences } from "@/lib/activities"
 import { sql } from "@/lib/db"
 import { put } from '@vercel/blob'
+import { sanitizeInput, validateNumericInput, validateDateInput, validateTimeInput, validateStringInput } from "@/lib/validation"
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
-    const activityId = parseInt(params.id)
-    
-    if (isNaN(activityId)) {
-      return NextResponse.json(
-        { error: "Invalid activity ID" },
-        { status: 400 }
-      )
-    }
-    
-    // Get session from cookies
-    const cookieHeader = request.headers.get("cookie") || ""
-    const sessionCookie = cookieHeader
-      .split("; ")
-      .find((cookie) => cookie.startsWith("session="))
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-    
-    const sessionToken = sessionCookie.split("=")[1]
-    const session = await getSession(sessionToken)
-    
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-    
-    // Check if user is admin
-    if (session.user.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden" },
-        { status: 403 }
-      )
-    }
-    
-    console.log("Admin fetching activity with ID:", activityId);
-    
-    const activity = await getActivityByIdWithReferences(activityId)
-    
-    if (!activity) {
-      return NextResponse.json(
-        { error: "Activity not found" },
-        { status: 404 }
-      )
-    }
-    
-    console.log("Admin successfully fetched activity:", activity.id);
-    return NextResponse.json(activity)
-  } catch (error: any) {
-    console.error("Error fetching activity:", error)
-    console.error("Error stack:", error.stack)
-    
-    // Return more detailed error information
-    return NextResponse.json(
-      { 
-        error: "Internal server error", 
-        message: error.message || "Unknown error",
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      },
-      { status: 500 }
-    )
-  }
-}
-
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const activityId = parseInt(params.id)
-    
-    if (isNaN(activityId)) {
-      return NextResponse.json(
-        { error: "Invalid activity ID" },
-        { status: 400 }
-      )
-    }
-    
     // Get session from cookies
     const cookieHeader = request.headers.get("cookie") || ""
     const sessionCookie = cookieHeader
@@ -129,7 +44,7 @@ export async function PUT(
     const documentationFiles = formData.getAll("documentation") as File[]
     const existingDocumentation = formData.getAll("existingDocumentation") as string[]
     
-    console.log("Received body for update:", body);
+    console.log("Received body:", body);
     
     // Extract fields from body with proper type handling
     const {
@@ -157,176 +72,92 @@ export async function PUT(
       rumpun_program = "kesehatan"
     } = body
     
-    // Validate required fields
-    if (!id_kantor || !tgl || !id_ambulan || !id_detail || !jam_berangkat || 
-        !id_driver || !area || !dari || !tujuan || !km_awal || !km_akhir || 
-        !biaya_antar) {
+    // Validate and sanitize required fields
+    const sanitizedTgl = validateDateInput(tgl)
+    const sanitizedIdAmbulan = validateNumericInput(id_ambulan)
+    const sanitizedIdDetail = validateNumericInput(id_detail)
+    const sanitizedJamBerangkat = validateTimeInput(jam_berangkat)
+    const sanitizedArea = validateStringInput(area)
+    const sanitizedDari = validateStringInput(dari, 100)
+    const sanitizedTujuan = validateStringInput(tujuan, 100)
+    const sanitizedKmAwal = validateNumericInput(km_awal, 0)
+    const sanitizedKmAkhir = validateNumericInput(km_akhir, 0)
+    const sanitizedBiayaAntar = validateNumericInput(biaya_antar, 0)
+    
+    if (!sanitizedTgl || !sanitizedIdAmbulan || !sanitizedIdDetail || !sanitizedJamBerangkat || 
+        !sanitizedArea || !sanitizedDari || !sanitizedTujuan || !sanitizedKmAwal || !sanitizedKmAkhir || 
+        !sanitizedBiayaAntar) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Invalid or missing required fields" },
         { status: 400 }
       )
     }
     
-    // Parse numeric fields with error handling
-    let km_awal_num: number;
-    let km_akhir_num: number;
-    let selisih_km: number;
+    // Validate and sanitize optional fields
+    const sanitizedTglPulang = tgl_pulang ? validateDateInput(tgl_pulang) : sanitizedTgl
+    const sanitizedJamPulang = jam_pulang ? validateTimeInput(jam_pulang) : sanitizedJamBerangkat
+    const sanitizedIdKantor = validateNumericInput(id_kantor)
+    const sanitizedIdDriver = validateNumericInput(id_driver)
+    const sanitizedAsistenLuarKota = asisten_luar_kota ? validateStringInput(asisten_luar_kota, 100) : null
+    const sanitizedKmAkhirNum = sanitizedKmAkhir
+    const sanitizedSelisihKm = sanitizedKmAkhirNum - sanitizedKmAwal
+    const sanitizedBiayaDibayar = biaya_dibayar ? validateNumericInput(biaya_dibayar, 0) : null
+    const sanitizedIdPemesan = id_pemesan ? validateNumericInput(id_pemesan) : null
+    const sanitizedIdPenerimaManfaat = id_penerima_manfaat ? validateNumericInput(id_penerima_manfaat) : null
+    const sanitizedInfaq = infaq !== undefined && infaq !== null ? validateNumericInput(infaq, 0) : null
+    const sanitizedIdReward = id_reward ? validateNumericInput(id_reward) : null
+    const sanitizedKegiatan = validateStringInput(kegiatan, 50) || "pengantaran"
+    const sanitizedRumpunProgram = validateStringInput(rumpun_program, 50) || "kesehatan"
     
-    try {
-      km_awal_num = parseInt(km_awal);
-      km_akhir_num = parseInt(km_akhir);
-      selisih_km = km_akhir_num - km_awal_num;
-      
-      if (isNaN(km_awal_num) || isNaN(km_akhir_num)) {
-        throw new Error("Invalid KM values");
-      }
-    } catch (numError) {
-      console.error("Numeric parsing error:", numError);
+    // Additional validation
+    if (sanitizedSelisihKm < 0) {
       return NextResponse.json(
-        { error: "Invalid numeric values for KM fields" },
+        { error: "KM akhir cannot be less than KM awal" },
         { status: 400 }
       )
     }
     
-    // Parse other numeric fields
-    let biaya_antar_num: number;
-    try {
-      biaya_antar_num = parseInt(biaya_antar);
-      if (isNaN(biaya_antar_num)) {
-        throw new Error("Invalid biaya_antar value");
-      }
-    } catch (numError) {
-      console.error("Biaya antar parsing error:", numError);
-      return NextResponse.json(
-        { error: "Invalid numeric value for biaya_antar" },
-        { status: 400 }
-      )
-    }
+    // Calculate bulan and tahun from tgl
+    const dateObj = new Date(sanitizedTgl)
+    const bulan = dateObj.getMonth() + 1
+    const tahun = dateObj.getFullYear()
+    const jml_hari_luar_kota = sanitizedArea === 'Luar Kota' ? 1 : 0
+    const status_layanan = "Selesai"
+    const pembatalan = "Tidak"
+    const keterbatasan = "Tidak"
     
-    // Set default values for some fields
-    const jml_hari_luar_kota = area === 'Luar Kota' ? 1 : 0;
-    const status_layanan = "Selesai";
-    const pembatalan = "Tidak";
-    const keterbatasan = "Tidak";
-    
-    // Parse optional numeric fields
-    let biaya_dibayar_num: number | null = null;
-    if (biaya_dibayar) {
-      try {
-        biaya_dibayar_num = parseInt(biaya_dibayar);
-        if (isNaN(biaya_dibayar_num)) {
-          biaya_dibayar_num = null;
-        }
-      } catch (e) {
-        biaya_dibayar_num = null;
-      }
-    }
-    
-    let infaq_num: number | null = null;
-    if (infaq) {
-      try {
-        infaq_num = parseInt(infaq);
-        if (isNaN(infaq_num)) {
-          infaq_num = null;
-        }
-      } catch (e) {
-        infaq_num = null;
-      }
-    }
-    
-    let id_reward_num: number | null = null;
-    if (id_reward) {
-      try {
-        id_reward_num = parseInt(id_reward);
-        if (isNaN(id_reward_num)) {
-          id_reward_num = null;
-        }
-      } catch (e) {
-        id_reward_num = null;
-      }
-    }
-    
-    let id_kantor_num: number | null = null;
-    if (id_kantor) {
-      try {
-        id_kantor_num = parseInt(id_kantor);
-        if (isNaN(id_kantor_num)) {
-          id_kantor_num = null;
-        }
-      } catch (e) {
-        id_kantor_num = null;
-      }
-    }
-    
-    let id_ambulan_num: number | null = null;
-    if (id_ambulan) {
-      try {
-        id_ambulan_num = parseInt(id_ambulan);
-        if (isNaN(id_ambulan_num)) {
-          id_ambulan_num = null;
-        }
-      } catch (e) {
-        id_ambulan_num = null;
-      }
-    }
-    
-    let id_detail_num: number | null = null;
-    if (id_detail) {
-      try {
-        id_detail_num = parseInt(id_detail);
-        if (isNaN(id_detail_num)) {
-          id_detail_num = null;
-        }
-      } catch (e) {
-        id_detail_num = null;
-      }
-    }
-    
-    let id_pemesan_num: number | null = null;
-    if (id_pemesan) {
-      try {
-        id_pemesan_num = parseInt(id_pemesan);
-        if (isNaN(id_pemesan_num)) {
-          id_pemesan_num = null;
-        }
-      } catch (e) {
-        id_pemesan_num = null;
-      }
-    }
-    
-    let id_penerima_manfaat_num: number | null = null;
-    if (id_penerima_manfaat) {
-      try {
-        id_penerima_manfaat_num = parseInt(id_penerima_manfaat);
-        if (isNaN(id_penerima_manfaat_num)) {
-          id_penerima_manfaat_num = null;
-        }
-      } catch (e) {
-        id_penerima_manfaat_num = null;
-      }
-    }
-    
-    let id_driver_num: number | null = null;
-    if (id_driver) {
-      try {
-        id_driver_num = parseInt(id_driver);
-        if (isNaN(id_driver_num)) {
-          id_driver_num = null;
-        }
-      } catch (e) {
-        id_driver_num = null;
-      }
-    }
+    // Use sanitized values for database insertion
+    const id_kantor_num = sanitizedIdKantor
+    const tglValue = sanitizedTgl
+    const tgl_pulangValue = sanitizedTglPulang
+    const id_ambulan_num = sanitizedIdAmbulan
+    const id_detail_num = sanitizedIdDetail
+    const jam_berangkatValue = sanitizedJamBerangkat
+    const jam_pulangValue = sanitizedJamPulang
+    const id_driver_num = sanitizedIdDriver
+    const areaValue = sanitizedArea
+    const dariValue = sanitizedDari
+    const tujuanValue = sanitizedTujuan
+    const km_awal_num = sanitizedKmAwal
+    const km_akhir_num = sanitizedKmAkhirNum
+    const selisih_km = sanitizedSelisihKm
+    const biaya_antar_num = sanitizedBiayaAntar
+    const biaya_dibayar_num = sanitizedBiayaDibayar
+    const infaq_num = sanitizedInfaq
+    const id_reward_num = sanitizedIdReward
+    const kegiatanValue = sanitizedKegiatan
+    const rumpun_programValue = sanitizedRumpunProgram
+    const asisten_luar_kotaValue = sanitizedAsistenLuarKota
     
     // Fetch required data from pemesan and penerima_manfaat tables
     let pemesanData = null
     let pmData = null
     
-    if (id_pemesan_num) {
-      console.log("Fetching pemesan data for id:", id_pemesan_num);
+    if (sanitizedIdPemesan) {
+      console.log("Fetching pemesan data for id:", sanitizedIdPemesan);
       try {
         const pemesanResult = await sql`
-          SELECT nama_pemesan, hp FROM pemesan WHERE id = ${id_pemesan_num}
+          SELECT nama_pemesan, hp FROM pemesan WHERE id = ${sanitizedIdPemesan}
         `
         console.log("Pemesan result:", pemesanResult);
         if (pemesanResult.length > 0) {
@@ -341,8 +172,8 @@ export async function PUT(
       }
     }
     
-    if (id_penerima_manfaat_num) {
-      console.log("Fetching PM data for id:", id_penerima_manfaat_num);
+    if (sanitizedIdPenerimaManfaat) {
+      console.log("Fetching PM data for id:", sanitizedIdPenerimaManfaat);
       try {
         const pmResult = await sql`
           SELECT 
@@ -358,7 +189,7 @@ export async function PUT(
             status_marital, 
             agama
           FROM penerima_manfaat 
-          WHERE id = ${id_penerima_manfaat_num}
+          WHERE id = ${sanitizedIdPenerimaManfaat}
         `
         console.log("PM result:", pmResult);
         if (pmResult.length > 0) {
@@ -373,70 +204,220 @@ export async function PUT(
       }
     }
     
-    // Update the activity
+    console.log("Data to insert:", {
+      id_kantor: id_kantor_num,
+      tgl: tglValue,
+      tgl_pulang: tgl_pulangValue,
+      bulan,
+      tahun,
+      id_ambulan: id_ambulan_num,
+      id_detail: id_detail_num,
+      jam_berangkat: jam_berangkatValue,
+      jam_pulang: jam_pulangValue,
+      id_driver: id_driver_num,
+      asisten_luar_kota: asisten_luar_kotaValue,
+      area: areaValue,
+      jml_hari_luar_kota,
+      dari: dariValue,
+      tujuan: tujuanValue,
+      km_awal_num: km_awal_num,
+      km_akhir_num: km_akhir_num,
+      selisih_km: selisih_km,
+      biaya_antar: biaya_antar_num,
+      biaya_dibayar: biaya_dibayar_num,
+      nama_pemesan: pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan',
+      hp: pemesanData ? pemesanData.hp : '000000000000',
+      nama_pm: pmData ? pmData.nama_pm : 'Tanpa PM',
+      alamat_pm: pmData ? pmData.alamat_pm : 'Alamat tidak tersedia',
+      nik: pmData ? pmData.nik : null,
+      no_kk: pmData ? pmData.no_kk : null,
+      tempat_lahir: pmData ? pmData.tempat_lahir : null,
+      // Convert date to string since it's VARCHAR in ambulan_activity table
+      tgl_lahir: pmData && pmData.tgl_lahir ? 
+        (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
+        null,
+      jenis_kelamin_pm: pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui',
+      // Convert usia_pm to string since it's VARCHAR in ambulan_activity table
+      usia_pm: pmData && pmData.usia_pm !== null ? 
+        pmData.usia_pm.toString() : 
+        '0',  // Default as string since it's VARCHAR and NOT NULL
+      // id_asnaf is INTEGER and NOT NULL
+      id_asnaf: pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1,
+      status_layanan,
+      pembatalan,
+      keterbatasan,
+      id_pemesan: sanitizedIdPemesan,
+      id_penerima_manfaat: sanitizedIdPenerimaManfaat,
+      infaq: infaq_num,
+      id_reward: id_reward_num,
+      kegiatan: kegiatanValue,
+      rumpun_program: rumpun_programValue
+    });
+    
+    // Insert the activity
+    let result;
     try {
+      // Log the values being inserted for debugging
+      console.log("Values being inserted:", {
+        id_kantor_num,
+        tglValue,
+        tgl_pulangValue: tgl_pulangValue ? tgl_pulangValue : tglValue,
+        bulan,
+        tahun,
+        id_ambulan_num,
+        id_detail_num,
+        jam_berangkatValue,
+        jam_pulangValue: jam_pulangValue ? jam_pulangValue : jam_berangkatValue,
+        id_driver_num,
+        asisten_luar_kotaValue: asisten_luar_kotaValue || null,
+        areaValue,
+        jml_hari_luar_kota,
+        dariValue,
+        tujuanValue,
+        km_awal_num,
+        km_akhir_num,
+        selisih_km,
+        biaya_antar_num,
+        biaya_dibayar_num,
+        nama_pemesan: pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan',
+        hp: pemesanData ? pemesanData.hp : '000000000000',
+        nama_pm: pmData ? pmData.nama_pm : 'Tanpa PM',
+        alamat_pm: pmData ? pmData.alamat_pm : 'Alamat tidak tersedia',
+        nik: pmData ? pmData.nik : null,
+        no_kk: pmData ? pmData.no_kk : null,
+        tempat_lahir: pmData ? pmData.tempat_lahir : null,
+        tgl_lahir: pmData && pmData.tgl_lahir ? 
+          (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
+          null,
+        jenis_kelamin_pm: pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui',
+        usia_pm: pmData && pmData.usia_pm !== null ? 
+          pmData.usia_pm.toString() : 
+          '0',
+        id_asnaf: pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1,
+        status_layanan,
+        pembatalan,
+        keterbatasan,
+        infaq_num,
+        id_reward_num,
+        reward_driver: 0,
+        reward_asisten: 0,
+        agama: pmData ? pmData.agama : null,
+        status_marital: pmData ? pmData.status_marital : null,
+        kegiatanValue: kegiatanValue || 'pengantaran',
+        rumpun_programValue: rumpun_programValue || 'kesehatan'
+      });
+
       // Sanitize the asisten_luar_kota value to prevent SQL issues
-      const sanitizedAsisten = asisten_luar_kota ? 
-        asisten_luar_kota.toString().replace(/'/g, "''") : 
+      const sanitizedAsisten = asisten_luar_kotaValue ? 
+        asisten_luar_kotaValue.toString().replace(/'/g, "''") : 
         null;
 
-      await sql`
-        UPDATE ambulan_activity SET
-          "id_kantor" = ${id_kantor_num},
-          "tgl" = ${tgl},
-          "tgl_pulang" = ${tgl_pulang ? tgl_pulang : tgl},
-          "bulan" = ${new Date(tgl).getMonth() + 1},
-          "tahun" = ${new Date(tgl).getFullYear()},
-          "id_ambulan" = ${id_ambulan_num},
-          "id_detail" = ${id_detail_num},
-          "jam_berangkat" = ${jam_berangkat},
-          "jam_pulang" = ${jam_pulang ? jam_pulang : jam_berangkat},
-          "id_driver" = ${id_driver_num},
-          "asisten_luar_kota" = ${sanitizedAsisten},
-          "area" = ${area},
-          "jml_hari_luar_kota" = ${jml_hari_luar_kota},
-          "dari" = ${dari},
-          "tujuan" = ${tujuan},
-          "km_awal" = ${km_awal_num},
-          "km_akhir" = ${km_akhir_num},
-          "selisih_km" = ${selisih_km},
-          "biaya_antar" = ${biaya_antar_num},
-          "biaya_dibayar" = ${biaya_dibayar_num},
-          "nama_pemesan" = ${pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan'},
-          "hp" = ${pemesanData ? pemesanData.hp : '000000000000'},
-          "nama_pm" = ${pmData ? pmData.nama_pm : 'Tanpa PM'},
-          "alamat_pm" = ${pmData ? pmData.alamat_pm : 'Alamat tidak tersedia'},
-          "nik" = ${pmData ? pmData.nik : null},
-          "no_kk" = ${pmData ? pmData.no_kk : null},
-          "tempat_lahir" = ${pmData ? pmData.tempat_lahir : null},
-          "tgl_lahir" = ${pmData && pmData.tgl_lahir ? 
+      result = await sql`
+        INSERT INTO ambulan_activity (
+          "id_kantor",
+          "tgl",
+          "tgl_pulang",
+          "bulan",
+          "tahun",
+          "id_ambulan",
+          "id_detail",
+          "jam_berangkat",
+          "jam_pulang",
+          "id_driver",
+          "asisten_luar_kota",
+          "area",
+          "jml_hari_luar_kota",
+          "dari",
+          "tujuan",
+          "km_awal",
+          "km_akhir",
+          "selisih_km",
+          "biaya_antar",
+          "biaya_dibayar",
+          "nama_pemesan",
+          "hp",
+          "nama_pm",
+          "alamat_pm",
+          "nik",
+          "no_kk",
+          "tempat_lahir",
+          "tgl_lahir",
+          "jenis_kelamin_pm",
+          "usia_pm",
+          "id_asnaf",
+          "status_layanan",
+          "pembatalan",
+          "keterbatasan",
+          "infaq",
+          "id_reward",
+          "reward_driver",
+          "reward_asisten",
+          "agama",
+          "status_marital",
+          "kegiatan",
+          "rumpun_program",
+          "tgl_insert"
+        )
+        VALUES (
+          ${id_kantor_num},
+          ${tglValue},
+          ${tgl_pulangValue ? tgl_pulangValue : tglValue},
+          ${bulan},
+          ${tahun},
+          ${id_ambulan_num},
+          ${id_detail_num},
+          ${jam_berangkatValue},
+          ${jam_pulangValue ? jam_pulangValue : jam_berangkatValue},
+          ${id_driver_num},
+          ${sanitizedAsisten},
+          ${areaValue},
+          ${jml_hari_luar_kota},
+          ${dariValue},
+          ${tujuanValue},
+          ${km_awal_num},
+          ${km_akhir_num},
+          ${selisih_km},
+          ${biaya_antar_num},
+          ${biaya_dibayar_num},
+          ${pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan'},
+          ${pemesanData ? pemesanData.hp : '000000000000'},
+          ${pmData ? pmData.nama_pm : 'Tanpa PM'},
+          ${pmData ? pmData.alamat_pm : 'Alamat tidak tersedia'},
+          ${pmData ? pmData.nik : null},
+          ${pmData ? pmData.no_kk : null},
+          ${pmData ? pmData.tempat_lahir : null},
+          ${pmData && pmData.tgl_lahir ? 
             (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
             null},
-          "jenis_kelamin_pm" = ${pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui'},
-          "usia_pm" = ${pmData && pmData.usia_pm !== null ? 
+          ${pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui'},
+          ${pmData && pmData.usia_pm !== null ? 
             pmData.usia_pm.toString() : 
             '0'},
-          "id_asnaf" = ${pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1},
-          "status_layanan" = ${status_layanan},
-          "pembatalan" = ${pembatalan},
-          "keterbatasan" = ${keterbatasan},
-          "infaq" = ${infaq_num},
-          "id_reward" = ${id_reward_num},
-          "agama" = ${pmData ? pmData.agama : null},
-          "status_marital" = ${pmData ? pmData.status_marital : null},
-          "kegiatan" = ${kegiatan || 'pengantaran'},
-          "rumpun_program" = ${rumpun_program || 'kesehatan'}
-        WHERE id = ${activityId}
+          ${pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1},
+          ${status_layanan},
+          ${pembatalan},
+          ${keterbatasan},
+          ${infaq_num},
+          ${id_reward_num},
+          ${0},
+          ${0},
+          ${pmData ? pmData.agama : null},
+          ${pmData ? pmData.status_marital : null},
+          ${kegiatanValue || 'pengantaran'},
+          ${rumpun_programValue || 'kesehatan'},
+          NOW()
+        )
+        RETURNING id
       `
     } catch (dbError: any) {
-      console.error("Database error updating activity:", dbError);
+      console.error("Database error inserting activity:", dbError);
       console.error("Database error code:", dbError.code);
       console.error("Database error detail:", dbError.detail);
       console.error("Database error hint:", dbError.hint);
       
       return NextResponse.json(
         { 
-          error: "Database error updating activity", 
+          error: "Database error inserting activity", 
           details: dbError.message,
           code: dbError.code,
           detail: dbError.detail,
@@ -445,6 +426,10 @@ export async function PUT(
         { status: 500 }
       )
     }
+    
+    // Get the inserted activity ID
+    const activityId = result[0].id;
+    console.log("Insert result:", result);
     
     // Process documentation files if any
     if (documentationFiles && documentationFiles.length > 0) {
@@ -462,38 +447,19 @@ export async function PUT(
           
           // Save the URL to the database
           await sql`
-            INSERT INTO dokumentasi_activity (id_activity, url)
-            VALUES (${activityId}, ${blob.url})
+            INSERT INTO dokumentasi_activity (activity_id, file_name, file_url, file_type, file_size)
+            VALUES (${activityId}, ${file.name}, ${blob.url}, ${file.type}, ${file.size})
           `;
         }
       } catch (docError: any) {
         console.error("Error processing documentation:", docError);
+        // We don't return an error here because the activity was successfully created
       }
     }
     
-    if (existingDocumentation && existingDocumentation.length > 0) {
-      try {
-        const currentDocsResult = await sql`
-          SELECT id FROM dokumentasi_activity WHERE id_activity = ${activityId}
-        `;
-        
-        const currentDocIds = currentDocsResult.map((row: any) => row.id.toString());
-        const docsToKeep = existingDocumentation.filter((id: string) => currentDocIds.includes(id));
-        const docsToDelete = currentDocIds.filter((id: string) => !docsToKeep.includes(id));
-        
-        for (const docId of docsToDelete) {
-          await sql`
-            DELETE FROM dokumentasi_activity WHERE id = ${docId}
-          `;
-        }
-      } catch (docError: any) {
-        console.error("Error removing documentation:", docError);
-      }
-    }
-    
-    return NextResponse.json({ id: activityId, message: "Activity updated successfully" })
+    return NextResponse.json({ id: activityId, message: "Activity created successfully" })
   } catch (error: any) {
-    console.error("Error updating activity:", error)
+    console.error("Error creating activity:", error)
     console.error("Error stack:", error.stack)
     console.error("Error code:", error.code)
     console.error("Error detail:", error.detail)
@@ -507,66 +473,6 @@ export async function PUT(
         detail: error.detail,
         hint: error.hint
       },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const activityId = parseInt(params.id)
-    
-    if (isNaN(activityId)) {
-      return NextResponse.json(
-        { error: "Invalid activity ID" },
-        { status: 400 }
-      )
-    }
-    
-    // Get session from cookies
-    const cookieHeader = request.headers.get("cookie") || ""
-    const sessionCookie = cookieHeader
-      .split("; ")
-      .find((cookie) => cookie.startsWith("session="))
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-    
-    const sessionToken = sessionCookie.split("=")[1]
-    const session = await getSession(sessionToken)
-    
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-    
-    // Check if user is admin
-    if (session.user.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden" },
-        { status: 403 }
-      )
-    }
-    
-    // Delete the activity
-    await sql`
-      DELETE FROM ambulan_activity WHERE id = ${activityId}
-    `
-    
-    return NextResponse.json({ message: "Activity deleted successfully" })
-  } catch (error) {
-    console.error("Error deleting activity:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
       { status: 500 }
     )
   }

@@ -151,10 +151,10 @@ export default function EditActivityPage({ params }: { params: { id: string } })
     km_awal: "",
     km_akhir: "",
     biaya_antar: "0", // This will be automatically calculated
-    biaya_dibayar: "0", // Default value
+    biaya_dibayar: "", // Allow empty value
     id_pemesan: "",
     id_penerima_manfaat: "",
-    infaq: "0", // Default value
+    infaq: "", // Allow empty value
     id_reward: "",
     kegiatan: "pengantaran",
     rumpun_program: "kesehatan",
@@ -250,10 +250,10 @@ export default function EditActivityPage({ params }: { params: { id: string } })
             km_awal: activity.km_awal?.toString() || "",
             km_akhir: activity.km_akhir?.toString() || "",
             biaya_antar: activity.biaya_antar?.toString() || "0",
-            biaya_dibayar: activity.biaya_dibayar?.toString() || "0",
+            biaya_dibayar: activity.biaya_dibayar !== null ? activity.biaya_dibayar.toString() : "",
             id_pemesan: activity.id_pemesan?.toString() || "",
             id_penerima_manfaat: activity.id_penerima_manfaat?.toString() || "",
-            infaq: activity.infaq?.toString() || "0",
+            infaq: activity.infaq !== null ? activity.infaq.toString() : "",
             id_reward: activity.id_reward?.toString() || "",
             kegiatan: activity.kegiatan || "pengantaran",
             rumpun_program: activity.rumpun_program || "kesehatan",
@@ -584,8 +584,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
         km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
         km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
         biaya_antar: formData.biaya_antar ? parseInt(formData.biaya_antar) : 0,
-        biaya_dibayar: formData.biaya_dibayar ? parseInt(formData.biaya_dibayar) : 0,
-        infaq: formData.infaq ? parseInt(formData.infaq) : 0,
+        biaya_dibayar: formData.biaya_dibayar !== "" ? parseInt(formData.biaya_dibayar) : null,
+        infaq: formData.infaq !== "" ? parseInt(formData.infaq) : null,
         id_reward: formData.id_reward ? parseInt(formData.id_reward) : null,
         id_kantor: formData.id_kantor ? parseInt(formData.id_kantor) : null,
         id_ambulan: formData.id_ambulan ? parseInt(formData.id_ambulan) : null,
@@ -1020,7 +1020,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
                   initialItemId={activityData?.id_pemesan || undefined}
                   onCreate={() => setShowCreatePemesan(true)}
                   name="id_pemesan"
-                  allowClear={true} // Allow clearing the field
+                  allowClear={true}
+                  autoPopulate={false} // Start with empty field
                 />
               </div>
               {validationErrors.id_pemesan && (
@@ -1064,7 +1065,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
                   initialItemId={activityData?.id_penerima_manfaat || undefined}
                   onCreate={() => setShowCreatePM(true)}
                   name="id_penerima_manfaat"
-                  allowClear={true} // Allow clearing the field
+                  allowClear={true}
+                  autoPopulate={false} // Start with empty field
                 />
               </div>
               {validationErrors.id_penerima_manfaat && (

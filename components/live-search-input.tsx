@@ -17,6 +17,8 @@ interface LiveSearchInputProps {
   onAutoFill?: (item: any) => void
   // New prop to allow clearing the field
   allowClear?: boolean
+  // New prop to control whether to auto-populate with initial values
+  autoPopulate?: boolean
 }
 
 export default function LiveSearchInput({
@@ -31,12 +33,13 @@ export default function LiveSearchInput({
   initialItemId,
   name,
   onAutoFill, // New prop for auto-fill functionality
-  allowClear = false // New prop to allow clearing the field
+  allowClear = false, // New prop to allow clearing the field
+  autoPopulate = true // New prop to control auto-population
 }: LiveSearchInputProps) {
-  const [searchTerm, setSearchTerm] = useState(initialValue)
+  const [searchTerm, setSearchTerm] = useState("")
   const [filteredItems, setFilteredItems] = useState<any[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(initialItemId || null)
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const initializedRef = useRef(false)
 
@@ -48,7 +51,7 @@ export default function LiveSearchInput({
 
   // Initialize the component only once
   useEffect(() => {
-    if (!initializedRef.current && memoizedItems.length > 0 && (initialItemId !== undefined || initialValue)) {
+    if (!initializedRef.current && autoPopulate && memoizedItems.length > 0 && (initialItemId !== undefined || initialValue)) {
       initializedRef.current = true
       
       if (initialItemId !== undefined) {
@@ -75,7 +78,7 @@ export default function LiveSearchInput({
         }
       }
     }
-  }, [memoizedItems, initialItemId, displayKey, searchKeysString, initialValue])
+  }, [memoizedItems, initialItemId, displayKey, searchKeysString, initialValue, autoPopulate])
 
   // Filter items based on search term - with proper dependency handling
   useEffect(() => {

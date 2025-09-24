@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { cookies } from "next/headers"
+import { validateStringInput } from "@/lib/validation"
 
 export interface User {
   id: number
@@ -22,13 +23,19 @@ export interface Session {
 // Get session by token
 export async function getSession(token: string): Promise<(Session & { user: User }) | null> {
   try {
+    // Validate token
+    const sanitizedToken = validateStringInput(token, 255, 1);
+    if (!sanitizedToken) {
+      return null;
+    }
+
     const result = await sql`
       SELECT 
         s.id, s.user_id, s.session_token, s.expires_at,
         u.id as user_id, u.name, u.email, u.id_cms_privileges, u.status, u.photo, u.id_driver
       FROM sessions s
       JOIN cms_users u ON s.user_id = u.id
-      WHERE s.session_token = ${token} AND s.expires_at > NOW() AND u.status = 'Active'
+      WHERE s.session_token = ${sanitizedToken} AND s.expires_at > NOW() AND u.status = 'Active'
     `
 
     if (result.length === 0) return null
@@ -63,7 +70,13 @@ export async function GET() {
 
     if (!sessionToken) return NextResponse.json({ user: null })
 
-    const session = await getSession(sessionToken)
+    // Validate token
+    const sanitizedToken = validateStringInput(sessionToken, 255, 1);
+    if (!sanitizedToken) {
+      return NextResponse.json({ user: null })
+    }
+
+    const session = await getSession(sanitizedToken)
     return NextResponse.json({ user: session?.user || null })
   } catch (error) {
     console.error("Error getting current user:", error)

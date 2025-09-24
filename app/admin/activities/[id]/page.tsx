@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { notFound, useRouter } from "next/navigation"
+import { notFound, useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -54,13 +54,15 @@ interface Activity {
 
 export default function AdminActivityDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading } = useAuth()
   const [activity, setActivity] = useState<Activity | null>(null)
   const [loadingActivity, setLoadingActivity] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
   const activityId = parseInt(params.id)
-  
+  const page = searchParams.get('page')
+
   useEffect(() => {
     if (isNaN(activityId)) {
       notFound()
@@ -119,6 +121,38 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
   const formatTime = (timeString: string) => {
     if (!timeString) return "-"
     return timeString.slice(0, 5) // Remove seconds
+  }
+
+  const handleDelete = async () => {
+    // Show confirmation popup
+    if (confirm("Apakah Anda yakin ingin menghapus aktivitas ini? Tindakan ini tidak dapat dibatalkan.")) {
+      try {
+        const response = await fetch(`/api/admin/activities/${activityId}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          router.push('/admin');
+        } else {
+          const errorData = await response.json();
+          alert(`Gagal menghapus aktivitas: ${errorData.error}`);
+        }
+      } catch (error) {
+        console.error("Error deleting activity:", error);
+        alert("Terjadi kesalahan saat menghapus aktivitas");
+      }
+    }
+  }
+
+  // Add handleBack function for proper navigation
+  const handleBack = () => {
+    // If we have a page parameter, go back to that specific page
+    if (page) {
+      router.push(`/admin?page=${page}`)
+    } else {
+      // Fallback to admin dashboard if no page parameter
+      router.push('/admin')
+    }
   }
 
   if (loading || loadingActivity) {
@@ -209,25 +243,8 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
                 </Link>
                 <Button 
                   variant="outline" 
-                  className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                  onClick={async () => {
-                    if (confirm("Apakah Anda yakin ingin menghapus aktivitas ini?")) {
-                      try {
-                        const response = await fetch(`/api/admin/activities/${activityId}`, {
-                          method: 'DELETE',
-                        });
-                        
-                        if (response.ok) {
-                          router.push('/admin');
-                        } else {
-                          alert("Gagal menghapus aktivitas");
-                        }
-                      } catch (error) {
-                        console.error("Error deleting activity:", error);
-                        alert("Terjadi kesalahan saat menghapus aktivitas");
-                      }
-                    }
-                  }}
+                  className="flex items-center gap-2"
+                  onClick={handleDelete}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -247,26 +264,28 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
                   </svg>
                   Hapus
                 </Button>
-                <Link href="/admin">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4"
-                    >
-                      <path d="m12 19-7-7 7-7" />
-                      <path d="M19 12H5" />
-                    </svg>
-                    Kembali
-                  </Button>
-                </Link>
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={handleBack} // Use handleBack instead of direct navigation
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="m12 19-7-7 7-7" />
+                    <path d="M19 12H5" />
+                  </svg>
+                  Kembali
+                </Button>
               </div>
             </div>
 

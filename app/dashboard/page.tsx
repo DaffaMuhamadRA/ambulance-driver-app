@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import ActivitiesGrid from "@/components/activities-grid"
 import { Button } from "@/components/ui/button"
@@ -54,15 +54,28 @@ interface Activity {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading } = useAuth()
   const [activities, setActivities] = useState<Activity[]>([])
   const [activitiesLoading, setActivitiesLoading] = useState(true)
+  const [initialPage, setInitialPage] = useState(1) // New state for initial page
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login")
     }
   }, [user, loading, router])
+
+  // Get the page parameter from URL on initial load
+  useEffect(() => {
+    const pageParam = searchParams.get('page')
+    if (pageParam) {
+      const pageNum = parseInt(pageParam, 10)
+      if (!isNaN(pageNum) && pageNum > 0) {
+        setInitialPage(pageNum)
+      }
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (user && user.role === "driver") {
@@ -135,6 +148,9 @@ export default function DashboardPage() {
         <div className="mt-6">
           <ActivitiesGrid 
             activities={activities} 
+            isAdmin={false}
+            onAddNew={fetchDriverActivities}
+            initialPage={initialPage} // Pass initialPage to ActivitiesGrid
           />
         </div>
       </div>
