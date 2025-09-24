@@ -169,45 +169,134 @@ export async function PUT(
       rumpun_program = "kesehatan"
     } = body
     
-    // Validate and sanitize required fields
-    const sanitizedTgl = validateDateInput(tgl)
-    const sanitizedIdAmbulan = validateNumericInput(id_ambulan)
-    const sanitizedIdDetail = validateNumericInput(id_detail)
-    const sanitizedJamBerangkat = validateTimeInput(jam_berangkat)
-    const sanitizedArea = validateStringInput(area)
-    const sanitizedDari = validateStringInput(dari, 100)
-    const sanitizedTujuan = validateStringInput(tujuan, 100)
-    const sanitizedKmAwal = validateNumericInput(km_awal, 0)
-    const sanitizedKmAkhir = validateNumericInput(km_akhir, 0)
-    const sanitizedBiayaAntar = validateNumericInput(biaya_antar, 0)
+    // For server-side reconciliation, we only validate fields that are provided
+    // If a field is not provided, we'll use the existing value from the database
+    const validationErrors = []
     
-    if (!sanitizedTgl || !sanitizedIdAmbulan || !sanitizedIdDetail || !sanitizedJamBerangkat || 
-        !sanitizedArea || !sanitizedDari || !sanitizedTujuan || !sanitizedKmAwal || !sanitizedKmAkhir || 
-        !sanitizedBiayaAntar) {
+    // Validate date if provided
+    let sanitizedTgl = null
+    if (tgl !== undefined) {
+      sanitizedTgl = validateDateInput(tgl)
+      if (!sanitizedTgl) validationErrors.push("Tanggal")
+    }
+    
+    // Validate id_ambulan if provided
+    let sanitizedIdAmbulan = null
+    if (id_ambulan !== undefined) {
+      sanitizedIdAmbulan = validateNumericInput(id_ambulan)
+      if (!sanitizedIdAmbulan) validationErrors.push("ID Ambulan")
+    }
+    
+    // Validate id_detail if provided
+    let sanitizedIdDetail = null
+    if (id_detail !== undefined) {
+      sanitizedIdDetail = validateNumericInput(id_detail)
+      if (!sanitizedIdDetail) validationErrors.push("ID Detail")
+    }
+    
+    // Validate jam_berangkat if provided
+    let sanitizedJamBerangkat = null
+    if (jam_berangkat !== undefined) {
+      // Handle time values that might include seconds (HH:MM:SS format)
+      let timeValue = jam_berangkat;
+      if (timeValue && timeValue.length === 8 && timeValue.split(':').length === 3) {
+        // If time is in HH:MM:SS format, extract only HH:MM
+        timeValue = timeValue.substring(0, 5);
+      }
+      sanitizedJamBerangkat = validateTimeInput(timeValue)
+      if (!sanitizedJamBerangkat) validationErrors.push("Jam Berangkat")
+    }
+    
+    // Validate area if provided
+    let sanitizedArea = null
+    if (area !== undefined) {
+      sanitizedArea = validateStringInput(area)
+      if (!sanitizedArea) validationErrors.push("Area")
+    }
+    
+    // Validate dari if provided
+    let sanitizedDari = null
+    if (dari !== undefined) {
+      sanitizedDari = validateStringInput(dari, 100)
+      if (!sanitizedDari) validationErrors.push("Dari")
+    }
+    
+    // Validate tujuan if provided
+    let sanitizedTujuan = null
+    if (tujuan !== undefined) {
+      sanitizedTujuan = validateStringInput(tujuan, 100)
+      if (!sanitizedTujuan) validationErrors.push("Tujuan")
+    }
+    
+    // Validate km_awal if provided
+    let sanitizedKmAwal = null
+    if (km_awal !== undefined) {
+      sanitizedKmAwal = validateNumericInput(km_awal, 0)
+      if (sanitizedKmAwal === null) validationErrors.push("KM Awal")
+    }
+    
+    // Validate km_akhir if provided
+    let sanitizedKmAkhir = null
+    if (km_akhir !== undefined) {
+      sanitizedKmAkhir = validateNumericInput(km_akhir, 0)
+      if (sanitizedKmAkhir === null) validationErrors.push("KM Akhir")
+    }
+    
+    // Validate biaya_antar if provided
+    let sanitizedBiayaAntar = null
+    if (biaya_antar !== undefined) {
+      sanitizedBiayaAntar = validateNumericInput(biaya_antar, 0)
+      if (sanitizedBiayaAntar === null) validationErrors.push("Biaya Antar")
+    }
+    
+    if (validationErrors.length > 0) {
       return NextResponse.json(
-        { error: "Invalid or missing required fields" },
+        { 
+          error: "Invalid fields provided",
+          details: `Field(s) yang tidak valid: ${validationErrors.join(", ")}`
+        },
         { status: 400 }
       )
     }
     
-    // Validate and sanitize optional fields
-    const sanitizedTglPulang = tgl_pulang ? validateDateInput(tgl_pulang) : sanitizedTgl
-    const sanitizedJamPulang = jam_pulang ? validateTimeInput(jam_pulang) : sanitizedJamBerangkat
-    const sanitizedIdKantor = id_kantor ? validateNumericInput(id_kantor) : null
-    const sanitizedIdDriver = validateNumericInput(id_driver)
-    const sanitizedAsistenLuarKota = asisten_luar_kota ? validateStringInput(asisten_luar_kota, 100) : null
-    const sanitizedKmAkhirNum = sanitizedKmAkhir
-    const sanitizedSelisihKm = sanitizedKmAkhirNum - sanitizedKmAwal
-    const sanitizedBiayaDibayar = biaya_dibayar ? validateNumericInput(biaya_dibayar, 0) : null
-    const sanitizedIdPemesan = id_pemesan ? validateNumericInput(id_pemesan) : null
-    const sanitizedIdPenerimaManfaat = id_penerima_manfaat ? validateNumericInput(id_penerima_manfaat) : null
-    const sanitizedInfaq = infaq !== undefined && infaq !== null ? validateNumericInput(infaq, 0) : null
-    const sanitizedIdReward = id_reward ? validateNumericInput(id_reward) : null
-    const sanitizedKegiatan = validateStringInput(kegiatan, 50) || "pengantaran"
-    const sanitizedRumpunProgram = validateStringInput(rumpun_program, 50) || "kesehatan"
+    // Validate and sanitize optional fields that are provided
+    const sanitizedTglPulang = tgl_pulang !== undefined ? validateDateInput(tgl_pulang) : null
+    let sanitizedJamPulang = null
+    if (jam_pulang !== undefined) {
+      // Handle time values that might include seconds (HH:MM:SS format)
+      let timeValue = jam_pulang;
+      if (timeValue && timeValue.length === 8 && timeValue.split(':').length === 3) {
+        // If time is in HH:MM:SS format, extract only HH:MM
+        timeValue = timeValue.substring(0, 5);
+      }
+      sanitizedJamPulang = validateTimeInput(timeValue)
+    }
+    const sanitizedIdKantor = id_kantor !== undefined ? validateNumericInput(id_kantor) : null
+    const sanitizedIdDriver = id_driver !== undefined ? validateNumericInput(id_driver) : null
+    const sanitizedAsistenLuarKota = asisten_luar_kota !== undefined ? validateStringInput(asisten_luar_kota, 100) : null
+    const sanitizedBiayaDibayar = biaya_dibayar !== undefined && biaya_dibayar !== "" ? validateNumericInput(biaya_dibayar, 0) : null
+    const sanitizedIdPemesan = id_pemesan !== undefined ? validateNumericInput(id_pemesan) : null
+    const sanitizedIdPenerimaManfaat = id_penerima_manfaat !== undefined ? validateNumericInput(id_penerima_manfaat) : null
+    const sanitizedInfaq = infaq !== undefined && infaq !== null && infaq !== "" ? validateNumericInput(infaq, 0) : null
+    const sanitizedIdReward = id_reward !== undefined ? validateNumericInput(id_reward) : null
+    const sanitizedKegiatan = kegiatan !== undefined ? validateStringInput(kegiatan, 50) : null
+    const sanitizedRumpunProgram = rumpun_program !== undefined ? validateStringInput(rumpun_program, 50) : null
     
-    // Additional validation
-    if (sanitizedSelisihKm < 0) {
+    // Use existing values for fields that weren't provided, or use provided values
+    const finalTgl = sanitizedTgl || existingActivity.tgl_berangkat
+    const finalIdAmbulan = sanitizedIdAmbulan || existingActivity.id_ambulan
+    const finalIdDetail = sanitizedIdDetail || existingActivity.id_detail
+    const finalJamBerangkat = sanitizedJamBerangkat || existingActivity.jam_berangkat
+    const finalArea = sanitizedArea || existingActivity.area
+    const finalDari = sanitizedDari || existingActivity.dari
+    const finalTujuan = sanitizedTujuan || existingActivity.tujuan
+    const finalKmAwal = sanitizedKmAwal !== null ? sanitizedKmAwal : existingActivity.km_awal
+    const finalKmAkhir = sanitizedKmAkhir !== null ? sanitizedKmAkhir : existingActivity.km_akhir
+    const finalBiayaAntar = sanitizedBiayaAntar !== null ? sanitizedBiayaAntar : existingActivity.biaya_antar
+    
+    // Additional validation - check if KM akhir is less than KM awal
+    const finalSelisihKm = finalKmAkhir - finalKmAwal
+    if (finalSelisihKm < 0) {
       return NextResponse.json(
         { error: "KM akhir cannot be less than KM awal" },
         { status: 400 }
@@ -215,89 +304,116 @@ export async function PUT(
     }
     
     // Calculate bulan and tahun from tgl
-    const dateObj = new Date(sanitizedTgl)
+    const dateObj = new Date(finalTgl)
     const bulan = dateObj.getMonth() + 1
     const tahun = dateObj.getFullYear()
-    const jml_hari_luar_kota = sanitizedArea === 'Luar Kota' ? 1 : 0
+    const jml_hari_luar_kota = finalArea === 'Luar Kota' ? 1 : 0
     const status_layanan = "Selesai"
     const pembatalan = "Tidak"
     const keterbatasan = "Tidak"
     
     // Use sanitized values for database update
-    const id_kantor_num = sanitizedIdKantor
-    const tglValue = sanitizedTgl
-    const tgl_pulangValue = sanitizedTglPulang
-    const id_ambulan_num = sanitizedIdAmbulan
-    const id_detail_num = sanitizedIdDetail
-    const jam_berangkatValue = sanitizedJamBerangkat
-    const jam_pulangValue = sanitizedJamPulang
-    const id_driver_num = sanitizedIdDriver
-    const areaValue = sanitizedArea
-    const dariValue = sanitizedDari
-    const tujuanValue = sanitizedTujuan
-    const km_awal_num = sanitizedKmAwal
-    const km_akhir_num = sanitizedKmAkhirNum
-    const selisih_km = sanitizedSelisihKm
-    const biaya_antar_num = sanitizedBiayaAntar
+    const id_kantor_num = sanitizedIdKantor !== null ? sanitizedIdKantor : existingActivity.id_kantor
+    const tglValue = finalTgl
+    const tgl_pulangValue = sanitizedTglPulang || existingActivity.tgl_pulang || finalTgl
+    const id_ambulan_num = finalIdAmbulan
+    const id_detail_num = finalIdDetail
+    const jam_berangkatValue = finalJamBerangkat
+    const jam_pulangValue = sanitizedJamPulang || existingActivity.jam_pulang || finalJamBerangkat
+    const id_driver_num = sanitizedIdDriver !== null ? sanitizedIdDriver : existingActivity.id_driver
+    const areaValue = finalArea
+    const dariValue = finalDari
+    const tujuanValue = finalTujuan
+    const km_awal_num = finalKmAwal
+    const km_akhir_num = finalKmAkhir
+    const selisih_km = finalSelisihKm
+    const biaya_antar_num = finalBiayaAntar
     const biaya_dibayar_num = sanitizedBiayaDibayar !== null ? sanitizedBiayaDibayar : existingActivity.biaya_dibayar
     const infaq_num = sanitizedInfaq !== null ? sanitizedInfaq : existingActivity.infaq
     const id_reward_num = sanitizedIdReward !== null ? sanitizedIdReward : existingActivity.id_reward
     const kegiatanValue = sanitizedKegiatan || existingActivity.kegiatan || 'pengantaran'
     const rumpun_programValue = sanitizedRumpunProgram || existingActivity.rumpun_program || 'kesehatan'
-    const asisten_luar_kotaValue = sanitizedAsistenLuarKota
+    const asisten_luar_kotaValue = sanitizedAsistenLuarKota !== null ? sanitizedAsistenLuarKota : existingActivity.asisten_luar_kota
     
-    // Fetch required data from pemesan and penerima_manfaat tables
+    // Fetch required data from pemesan and penerima_manfaat tables if IDs were provided
     let pemesanData = null
     let pmData = null
     
-    if (sanitizedIdPemesan) {
-      console.log("Fetching pemesan data for id:", sanitizedIdPemesan);
-      try {
-        const pemesanResult = await sql`
-          SELECT nama_pemesan, hp FROM pemesan WHERE id = ${sanitizedIdPemesan}
-        `
-        console.log("Pemesan result:", pemesanResult);
-        if (pemesanResult.length > 0) {
-          pemesanData = pemesanResult[0]
+    if (sanitizedIdPemesan !== null) {
+      if (sanitizedIdPemesan > 0) {
+        console.log("Fetching pemesan data for id:", sanitizedIdPemesan);
+        try {
+          const pemesanResult = await sql`
+            SELECT nama_pemesan, hp FROM pemesan WHERE id = ${sanitizedIdPemesan}
+          `
+          console.log("Pemesan result:", pemesanResult);
+          if (pemesanResult.length > 0) {
+            pemesanData = pemesanResult[0]
+          }
+        } catch (dbError: any) {
+          console.error("Database error fetching pemesan:", dbError);
+          return NextResponse.json(
+            { error: "Database error fetching pemesan data", details: dbError.message },
+            { status: 500 }
+          )
         }
-      } catch (dbError: any) {
-        console.error("Database error fetching pemesan:", dbError);
-        return NextResponse.json(
-          { error: "Database error fetching pemesan data", details: dbError.message },
-          { status: 500 }
-        )
+      }
+      // If sanitizedIdPemesan is 0 or null, we'll clear the pemesan data
+    } else {
+      // If no new pemesan ID was provided, use existing pemesan data
+      pemesanData = {
+        nama_pemesan: existingActivity.nama_pemesan,
+        hp: existingActivity.hp
       }
     }
     
-    if (sanitizedIdPenerimaManfaat) {
-      console.log("Fetching PM data for id:", sanitizedIdPenerimaManfaat);
-      try {
-        const pmResult = await sql`
-          SELECT 
-            nama_pm, 
-            alamat_pm, 
-            jenis_kelamin_pm, 
-            usia_pm, 
-            nik, 
-            no_kk, 
-            tempat_lahir, 
-            tgl_lahir, 
-            id_asnaf, 
-            status_marital, 
-            agama
-          FROM penerima_manfaat 
-          WHERE id = ${sanitizedIdPenerimaManfaat}
-        `
-        console.log("PM result:", pmResult);
-        if (pmResult.length > 0) {
-          pmData = pmResult[0]
+    if (sanitizedIdPenerimaManfaat !== null) {
+      if (sanitizedIdPenerimaManfaat > 0) {
+        console.log("Fetching PM data for id:", sanitizedIdPenerimaManfaat);
+        try {
+          const pmResult = await sql`
+            SELECT 
+              nama_pm, 
+              alamat_pm, 
+              jenis_kelamin_pm, 
+              usia_pm, 
+              nik, 
+              no_kk, 
+              tempat_lahir, 
+              tgl_lahir, 
+              id_asnaf, 
+              status_marital, 
+              agama
+            FROM penerima_manfaat 
+            WHERE id = ${sanitizedIdPenerimaManfaat}
+          `
+          console.log("PM result:", pmResult);
+          if (pmResult.length > 0) {
+            pmData = pmResult[0]
+          }
+        } catch (dbError: any) {
+          console.error("Database error fetching PM:", dbError);
+          return NextResponse.json(
+            { error: "Database error fetching PM data", details: dbError.message },
+            { status: 500 }
+          )
         }
-      } catch (dbError: any) {
-        console.error("Database error fetching PM:", dbError);
-        return NextResponse.json(
-          { error: "Database error fetching PM data", details: dbError.message },
-          { status: 500 }
-        )
+      }
+      // If sanitizedIdPenerimaManfaat is 0 or null, we'll clear the PM data
+    } else {
+      // If no new PM ID was provided, use existing PM data
+      pmData = {
+        nama_pm: existingActivity.nama_pm,
+        alamat_pm: existingActivity.alamat_pm,
+        jenis_kelamin_pm: existingActivity.jenis_kelamin_pm,
+        usia_pm: existingActivity.usia_pm,
+        nik: existingActivity.nik,
+        no_kk: existingActivity.no_kk,
+        tempat_lahir: existingActivity.tempat_lahir,
+        tgl_lahir: existingActivity.tgl_lahir,
+        id_asnaf: existingActivity.id_asnaf,
+        status_marital: existingActivity.status_marital,
+        agama: existingActivity.agama
       }
     }
     

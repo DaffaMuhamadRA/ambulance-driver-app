@@ -627,11 +627,8 @@ export default function EditActivityPage({ params }: { params: { id: string } })
       setError(err instanceof Error ? err.message : "Gagal memperbarui aktivitas")
       console.error("Form Submission Error:", err)
     } finally {
-      // Only set loading to false if we're not redirecting
-      // This prevents UI flickering during redirect
-      if (error) {
-        setLoadingData(false)
-      }
+      // Always set loading to false after submission attempt
+      setLoadingData(false)
     }
   }
 

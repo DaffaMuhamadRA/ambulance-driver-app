@@ -66,7 +66,13 @@ export async function POST(request: Request) {
     const sanitizedTgl = validateDateInput(tgl)
     const sanitizedIdAmbulan = validateNumericInput(id_ambulan)
     const sanitizedIdDetail = validateNumericInput(id_detail)
-    const sanitizedJamBerangkat = validateTimeInput(jam_berangkat)
+    // Handle time values that might include seconds (HH:MM:SS format)
+    let jamBerangkatValue = jam_berangkat;
+    if (jamBerangkatValue && jamBerangkatValue.length === 8 && jamBerangkatValue.split(':').length === 3) {
+      // If time is in HH:MM:SS format, extract only HH:MM
+      jamBerangkatValue = jamBerangkatValue.substring(0, 5);
+    }
+    const sanitizedJamBerangkat = validateTimeInput(jamBerangkatValue)
     const sanitizedArea = validateStringInput(area)
     const sanitizedDari = validateStringInput(dari, 100)
     const sanitizedTujuan = validateStringInput(tujuan, 100)
@@ -85,7 +91,16 @@ export async function POST(request: Request) {
     
     // Validate and sanitize optional fields
     const sanitizedTglPulang = tgl_pulang ? validateDateInput(tgl_pulang) : sanitizedTgl
-    const sanitizedJamPulang = jam_pulang ? validateTimeInput(jam_pulang) : sanitizedJamBerangkat
+    let sanitizedJamPulang: string | null = sanitizedJamBerangkat
+    if (jam_pulang) {
+      // Handle time values that might include seconds (HH:MM:SS format)
+      let jamPulangValue = jam_pulang;
+      if (jamPulangValue && jamPulangValue.length === 8 && jamPulangValue.split(':').length === 3) {
+        // If time is in HH:MM:SS format, extract only HH:MM
+        jamPulangValue = jamPulangValue.substring(0, 5);
+      }
+      sanitizedJamPulang = validateTimeInput(jamPulangValue)
+    }
     const sanitizedIdKantor = id_kantor ? validateNumericInput(id_kantor) : null
     const sanitizedIdDriver = validateNumericInput(id_driver)
     const sanitizedAsistenLuarKota = asisten_luar_kota ? validateStringInput(asisten_luar_kota, 100) : null
