@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getActivities } from "@/lib/activities"
+import { getActivitiesForUser } from "@/lib/activities"
 import { getSession } from "@/app/api/auth/session/route"
 
 export async function GET(request: Request) {
@@ -21,17 +21,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     
-    // Use id_driver from the user session
+    // Use the user object to get activities
     // Log the values for debugging
     console.log("Session user:", session.user)
-    console.log("Using driver ID:", session.user.id_driver)
     
-    const driverId = session.user.id_driver
-    if (!driverId) {
+    if (!session.user.id_driver) {
       return NextResponse.json({ error: "Driver ID not found in user session" }, { status: 400 })
     }
     
-    const activities = await getActivities(driverId)
+    const activities = await getActivitiesForUser(session.user)
     return NextResponse.json(activities)
   } catch (error) {
     console.error("Error fetching driver activities:", error)

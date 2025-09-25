@@ -9,14 +9,14 @@ export interface User {
   role: "driver" | "admin";
   status: string;
   photo?: string;
-  id_driver?: number;
+  id_driver?: number; // Add this for driver users
 }
 
 export interface Session {
   id: number;
   user_id: number;
   session_token: string;
-  expires_at: Date;
+  expire_at: Date; // Changed from expires_at to expire_at to match database schema
 }
 
 // Generate a secure session token
@@ -34,7 +34,7 @@ export async function createSession(userId: number): Promise<string> {
 
   try {
     await sql`
-      INSERT INTO sessions (user_id, session_token, expires_at)
+      INSERT INTO sessions (user_id, session_token, expire_at)
       VALUES (${userId}, ${sessionToken}, ${expiresAt})
     `;
 
@@ -48,10 +48,11 @@ export async function createSession(userId: number): Promise<string> {
 // Authenticate user
 export async function authenticateUser(identifier: string, password: string): Promise<User | null> {
   try {
+    // For this implementation, we'll use email as the identifier
     const result = await sql`
-      SELECT id, name, email, password, id_cms_privileges, status, photo, id_driver
+      SELECT id, name, email, password, id_cms_privileges, status, photo
       FROM cms_users 
-      WHERE (name = ${identifier} OR email = ${identifier}) AND status = 'Active'
+      WHERE email = ${identifier} AND status = 'Active'
     `;
 
     if (result.length === 0) {
@@ -74,6 +75,21 @@ export async function authenticateUser(identifier: string, password: string): Pr
       return null;
     }
 
+    // For driver users, get their driver ID
+    let id_driver: number | undefined = undefined;
+    if (user.id_cms_privileges == 2) {
+      // This is a driver user, get their driver ID
+      const driverResult = await sql`
+        SELECT id 
+        FROM driver 
+        WHERE username = ${user.email}
+      `;
+      
+      if (driverResult.length > 0) {
+        id_driver = driverResult[0].id;
+      }
+    }
+
     return {
       id: user.id,
       name: user.name,
@@ -81,7 +97,7 @@ export async function authenticateUser(identifier: string, password: string): Pr
       role: user.id_cms_privileges == 1 ? "admin" : "driver",
       status: user.status,
       photo: user.photo,
-      id_driver: user.id_driver,
+      id_driver: id_driver, // Only set for drivers
     };
   } catch (error) {
     console.error("Database error during authentication:", error);
@@ -117,7 +133,7 @@ export async function deleteSession(token: string): Promise<void> {
 export async function cleanExpiredSessions(): Promise<void> {
   try {
     // This function properly deletes expired sessions from the database
-    await sql`DELETE FROM sessions WHERE expires_at < NOW()`;
+    await sql`DELETE FROM sessions WHERE expire_at < NOW()`;
   } catch (error) {
     console.error("Error cleaning expired sessions:", error);
     throw new Error("Failed to clean expired sessions");

@@ -4,6 +4,10 @@ import { getActivityById, getActivityByIdWithReferences } from "@/lib/activities
 import { sql } from "@/lib/db"
 import { put } from '@vercel/blob'
 import { sanitizeInput, validateNumericInput, validateDateInput, validateTimeInput, validateStringInput } from "@/lib/validation"
+import { neon } from "@neondatabase/serverless"
+
+// Create a separate SQL client for documentation operations to match the working dokumentasi route
+const docSql = neon(process.env.DATABASE_URL!)
 
 export async function GET(
   request: Request,
@@ -126,9 +130,35 @@ export async function PUT(
     
     // Parse form data
     const formData = await request.formData()
+    console.log("Received form data keys:", Array.from(formData.keys()));
+    
+    // Log all form data for debugging
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`Form data entry - ${key}: File(${value.name}, ${value.size} bytes)`);
+      } else {
+        console.log(`Form data entry - ${key}:`, value);
+      }
+    }
+    
     const body = JSON.parse(formData.get("data") as string || "{}")
     const documentationFiles = formData.getAll("documentation") as File[]
     const existingDocumentation = formData.getAll("existingDocumentation") as string[]
+    
+    console.log("Documentation files count:", documentationFiles.length);
+    console.log("Existing documentation count:", existingDocumentation.length);
+    
+    // Log details about each documentation file
+    documentationFiles.forEach((file, index) => {
+      console.log(`Documentation file ${index}:`, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
+    });
+    
+    // Log existing documentation IDs
+    console.log("Existing documentation IDs:", existingDocumentation);
     
     console.log("Received body for update:", body);
     
@@ -218,7 +248,7 @@ export async function PUT(
       )
     }
     
-    // Calculate bulan and tahun from tgl
+    // Calculate bulan dan tahun dari tgl
     const dateObj = new Date(sanitizedTgl)
     const bulan = dateObj.getMonth() + 1
     const tahun = dateObj.getFullYear()
@@ -250,7 +280,7 @@ export async function PUT(
     const rumpun_programValue = sanitizedRumpunProgram
     const asisten_luar_kotaValue = sanitizedAsistenLuarKota
     
-    // Fetch required data from pemesan and penerima_manfaat tables
+    // Fetch required data from pemesan dan penerima_manfaat tables
     let pemesanData = null
     let pmData = null
     
@@ -378,37 +408,133 @@ export async function PUT(
       )
     }
     
-    // Process documentation files if any
+    // Process documentation files if any - NEW APPROACH
     if (documentationFiles && documentationFiles.length > 0) {
       try {
         console.log(`Processing ${documentationFiles.length} documentation files for activity ${activityId}`);
         
-        // Process each documentation file
+        // Step 1: Upload all files to Vercel Blob first and collect URLs
+        const blobUrls: string[] = [];
+        
         for (const file of documentationFiles) {
-          // Upload to Vercel Blob
-          const blob = await put(
-            `documentation/${activityId}/${file.name}`, 
-            file, 
-            { access: 'public' }
-          );
+          // Log file details for debugging
+          console.log("Processing file:", {
+            name: file.name,
+            size: file.size,
+            type: file.type
+          });
           
-          // Save the URL to the database
-          await sql`
-            INSERT INTO dokumentasi_activity (activity_id, file_name, file_url, file_type, file_size)
-            VALUES (${activityId}, ${file.name}, ${blob.url}, ${file.type}, ${file.size})
-          `;
+          // Upload to Vercel Blob with proper error handling
+          try {
+            const blob = await put(
+              `documentation/${activityId}/${file.name}`, 
+              file, 
+              { access: 'public', allowOverwrite: true }
+            );
+            console.log("Blob uploaded successfully:", blob.url);
+            blobUrls.push(blob.url);
+          } catch (uploadError: any) {
+            console.error("Error uploading to Vercel Blob:", uploadError);
+            throw new Error(`Failed to upload file ${file.name} to storage: ${uploadError.message}`);
+          }
         }
+        
+        console.log("All files uploaded. Blob URLs:", blobUrls);
+        
+        // Add a small delay to ensure blob is fully available
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Step 2: Insert all URLs into database
+        console.log("Inserting documentation records into database...");
+        
+        // First, verify that the activity exists and get its details
+        let activityDetails;
+        try {
+          const activityCheck = await docSql`
+            SELECT id, tgl_pulang FROM ambulan_activity WHERE id = ${activityId}
+          `;
+          
+          if (activityCheck.length === 0) {
+            throw new Error(`Activity with ID ${activityId} does not exist`);
+          }
+          activityDetails = activityCheck[0];
+          console.log("Verified activity exists:", activityDetails);
+        } catch (activityCheckError: any) {
+          console.error("Error verifying activity existence:", activityCheckError);
+          throw new Error(`Failed to verify activity: ${activityCheckError.message}`);
+        }
+        
+        // Insert all documentation records using a transaction-like approach
+        const insertedRecords = [];
+        let hasError = false;
+        let errorMessage = "";
+        
+        for (const url of blobUrls) {
+          try {
+            console.log("Inserting documentation with values:", {
+              activityId: activityId,
+              url: url
+            });
+            
+            // Log the exact query we're about to execute
+            console.log("Executing query with parameters:", activityId, url);
+            
+            // Make sure the parameters are of the correct type
+            const typedActivityId = parseInt(activityId.toString());
+            const typedUrl = url.toString();
+            
+            console.log("Typed parameters:", typedActivityId, typedUrl);
+            
+            const insertResult = await docSql`
+              INSERT INTO dokumentasi_activity (id_activity, url)
+              VALUES (${typedActivityId}, ${typedUrl})
+              RETURNING id, id_activity, url, created_at
+            `;
+            console.log("Database insert successful:", insertResult);
+            insertedRecords.push(insertResult[0]);
+          } catch (dbError: any) {
+            console.error("Database insertion error:", dbError);
+            console.error("Error code:", dbError.code);
+            console.error("Error detail:", dbError.detail);
+            console.error("Error hint:", dbError.hint);
+            
+            // Log the exact query that failed
+            console.error("Failed query values:", {
+              activityId: activityId,
+              url: url
+            });
+            
+            hasError = true;
+            errorMessage = `Failed to save file record to database: ${dbError.message}`;
+            break; // Stop processing if any insert fails
+          }
+        }
+        
+        // If any insert failed, we should handle this appropriately
+        if (hasError) {
+          console.error("One or more database insertions failed:", errorMessage);
+          throw new Error(errorMessage);
+        }
+        
+        console.log("All documentation records inserted successfully:", insertedRecords);
       } catch (docError: any) {
         console.error("Error processing documentation:", docError);
-        // We don't return an error here because the activity was successfully updated
+        // Return an error to the client so they know something went wrong
+        return NextResponse.json(
+          { 
+            error: "Failed to process documentation", 
+            details: docError.message 
+          },
+          { status: 500 }
+        );
       }
     }
     
     // Remove documentation that was deleted
     if (existingDocumentation && existingDocumentation.length > 0) {
       try {
-        const currentDocsResult = await sql`
-          SELECT id FROM dokumentasi_activity WHERE activity_id = ${activityId}
+        const currentDocsResult = await docSql`
+          SELECT id FROM dokumentasi_activity WHERE id_activity = ${activityId}
         `;
         
         const currentDocIds = currentDocsResult.map((row: any) => row.id.toString());
@@ -417,7 +543,7 @@ export async function PUT(
         
         // Delete documentation that was removed
         for (const docId of docsToDelete) {
-          await sql`
+          await docSql`
             DELETE FROM dokumentasi_activity WHERE id = ${docId}
           `;
         }

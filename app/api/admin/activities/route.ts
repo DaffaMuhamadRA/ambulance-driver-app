@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/app/api/auth/session/route"
-import { getActivityById, getActivityByIdWithReferences } from "@/lib/activities"
+import { getActivityById } from "@/lib/activities"
 import { sql } from "@/lib/db"
 import { put } from '@vercel/blob'
 import { sanitizeInput, validateNumericInput, validateDateInput, validateTimeInput, validateStringInput } from "@/lib/validation"
@@ -53,22 +53,22 @@ export async function GET(request: Request) {
         aa.asisten_luar_kota,
         aa.km_awal,
         aa.km_akhir,
-        aa.nama_pemesan,
-        aa.hp,
-        aa.nama_pm,
-        aa.alamat_pm,
-        aa.jenis_kelamin_pm,
-        aa.usia_pm,
-        aa.nik,
-        aa.no_kk,
-        aa.tempat_lahir,
-        aa.tgl_lahir,
-        aa.status_marital,
+        p.nama_pemesan,  -- Get from pemesan table
+        p.hp,            -- Get from pemesan table
+        pm.nama_pm,      -- Get from penerima_manfaat table
+        pm.alamat_pm,
+        pm.jenis_kelamin_pm,
+        pm.usia_pm,
+        pm.nik,
+        pm.no_kk,
+        pm.tempat_lahir,
+        pm.tgl_lahir,
+        pm.status_marital,
         aa.kegiatan,
         aa.rumpun_program,
         aa.infaq,
         aa.biaya_dibayar,
-        aa.id_asnaf,
+        pm.id_asnaf,
         da.detail_antar as detail,
         rp.jenis,
         rp.tipe,
@@ -83,6 +83,8 @@ export async function GET(request: Request) {
       LEFT JOIN reward_pengantaran rp ON aa.id_reward = rp.id
       LEFT JOIN ambulan a ON aa.id_ambulan = a.id
       LEFT JOIN cms_users cu ON aa.id_driver = cu.id
+      LEFT JOIN pemesan p ON aa.id_pemesan = p.id  -- Join with pemesan table
+      LEFT JOIN penerima_manfaat pm ON aa.id_penerima_manfaat = pm.id  -- Join with penerima_manfaat table
       ORDER BY aa.tgl DESC, aa.jam_berangkat DESC
       LIMIT 100
     `
@@ -242,7 +244,7 @@ export async function POST(request: Request) {
       )
     }
     
-    // Calculate bulan and tahun from tgl
+    // Calculate bulan dan tahun from tgl
     const dateObj = new Date(sanitizedTgl)
     const bulan = dateObj.getMonth() + 1
     const tahun = dateObj.getFullYear()
@@ -561,20 +563,24 @@ export async function POST(request: Request) {
       try {
         console.log(`Processing ${documentationFiles.length} documentation files for activity ${activityId}`);
         
+        // Get tgl_pulang from the activity
+        const tglPulang = tgl_pulangValue ? tgl_pulangValue : tglValue;
+        
         // Process each documentation file
         for (const file of documentationFiles) {
           // Upload to Vercel Blob
           const blob = await put(
             `documentation/${activityId}/${file.name}`, 
             file, 
-            { access: 'public' }
+            { access: 'public', allowOverwrite: true }
           );
           
           // Save the URL to the database
           await sql`
-            INSERT INTO dokumentasi_activity (activity_id, file_name, file_url, file_type, file_size)
-            VALUES (${activityId}, ${file.name}, ${blob.url}, ${file.type}, ${file.size})
+            INSERT INTO dokumentasi_activity (id_activity, url)
+            VALUES (${activityId}, ${blob.url})
           `;
+
         }
       } catch (docError: any) {
         console.error("Error processing documentation:", docError);

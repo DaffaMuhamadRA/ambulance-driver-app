@@ -7,6 +7,7 @@ const sql = neon(process.env.DATABASE_URL!)
 export async function POST(request: NextRequest) {
   try {
     const { activityId, files } = await request.json()
+    console.log("Received data:", { activityId, files });
 
     // Validate activityId
     const sanitizedActivityId = validateNumericInput(activityId)
@@ -19,37 +20,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid files data" }, { status: 400 })
     }
 
-    // Validate each file
+    // Validate each file - only require url since that's what we store in the database
     for (const file of files) {
-      if (!file.filename || !file.url || !file.type || !file.size) {
-        return NextResponse.json({ error: "Invalid file data" }, { status: 400 })
+      if (!file.url) {
+        return NextResponse.json({ error: "Invalid file data: URL is required" }, { status: 400 })
       }
       
-      // Sanitize file data
-      const sanitizedFilename = validateStringInput(file.filename, 255)
+      // Sanitize URL
       const sanitizedUrl = validateStringInput(file.url, 500)
-      const sanitizedType = validateStringInput(file.type, 100)
-      
-      if (!sanitizedFilename || !sanitizedUrl || !sanitizedType) {
-        return NextResponse.json({ error: "Invalid file data" }, { status: 400 })
+      if (!sanitizedUrl) {
+        return NextResponse.json({ error: "Invalid file URL" }, { status: 400 })
       }
     }
 
     // Insert documentation records
     const insertPromises = files.map(async (file: any) => {
-      const sanitizedFilename = validateStringInput(file.filename, 255)
       const sanitizedUrl = validateStringInput(file.url, 500)
-      const sanitizedType = validateStringInput(file.type, 100)
-      const sanitizedSize = validateNumericInput(file.size)
+      
+      console.log("Inserting documentation:", { 
+        sanitizedActivityId, 
+        sanitizedUrl
+      });
       
       return await sql`
-        INSERT INTO dokumentasi_activity (activity_id, file_name, file_url, file_type, file_size)
-        VALUES (${sanitizedActivityId}, ${sanitizedFilename}, ${sanitizedUrl}, ${sanitizedType}, ${sanitizedSize})
-        RETURNING *
+        INSERT INTO dokumentasi_activity (id_activity, url)
+        VALUES (${sanitizedActivityId}, ${sanitizedUrl})
+        RETURNING id, id_activity, url, created_at
       `
     })
 
     const results = await Promise.all(insertPromises)
+    console.log("Insert results:", results);
 
     return NextResponse.json({
       success: true,
@@ -73,9 +74,9 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await sql`
-      SELECT id, activity_id, file_name, file_url, file_type, file_size, created_at
+      SELECT id, id_activity, url, created_at
       FROM dokumentasi_activity 
-      WHERE activity_id = ${sanitizedActivityId}
+      WHERE id_activity = ${sanitizedActivityId}
       ORDER BY created_at DESC
     `
 

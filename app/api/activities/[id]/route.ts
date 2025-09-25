@@ -4,6 +4,10 @@ import { getActivityById, getActivityByIdWithReferences } from "@/lib/activities
 import { sql } from "@/lib/db"
 import { put } from '@vercel/blob'
 import { sanitizeInput, validateNumericInput, validateDateInput, validateTimeInput, validateStringInput } from "@/lib/validation"
+import { neon } from "@neondatabase/serverless"
+
+// Create a separate SQL client for documentation operations to match the working dokumentasi route
+const docSql = neon(process.env.DATABASE_URL!)
 
 export async function GET(
   request: Request,
@@ -12,7 +16,10 @@ export async function GET(
   try {
     const activityId = parseInt(params.id)
     
+    console.log("GET request for activity ID:", activityId);
+    
     if (isNaN(activityId)) {
+      console.log("Invalid activity ID provided:", params.id);
       return NextResponse.json(
         { error: "Invalid activity ID" },
         { status: 400 }
@@ -26,6 +33,7 @@ export async function GET(
       .find((cookie) => cookie.startsWith("session="))
     
     if (!sessionCookie) {
+      console.log("No session cookie found");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -36,6 +44,7 @@ export async function GET(
     const session = await getSession(sessionToken)
     
     if (!session) {
+      console.log("Invalid session token");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -44,9 +53,13 @@ export async function GET(
     
     console.log("Fetching activity with ID:", activityId);
     
+    // Add specific logging for debugging
+    console.log("About to call getActivityByIdWithReferences");
     const activity = await getActivityByIdWithReferences(activityId)
+    console.log("Returned from getActivityByIdWithReferences, activity:", activity);
     
     if (!activity) {
+      console.log("Activity not found with ID:", activityId);
       return NextResponse.json(
         { error: "Activity not found" },
         { status: 404 }
@@ -58,7 +71,9 @@ export async function GET(
       // Check if the activity's driver ID matches the current user's driver ID
       // If user.id_driver is null/undefined, fallback to user.id for comparison
       const userDriverId = session.user.id_driver || session.user.id
+      console.log("Driver role check - userDriverId:", userDriverId, "activity.user.id:", activity.user.id);
       if (userDriverId === null || activity.user.id !== userDriverId) {
+        console.log("Forbidden access - driver ID mismatch");
         return NextResponse.json(
           { error: "Forbidden" },
           { status: 403 }
@@ -91,7 +106,8 @@ export async function PUT(
   try {
     const activityId = parseInt(params.id)
     
-    if (isNaN(activityId)) {
+    // Validate activity ID
+    if (isNaN(activityId) || activityId <= 0) {
       return NextResponse.json(
         { error: "Invalid activity ID" },
         { status: 400 }
@@ -121,13 +137,14 @@ export async function PUT(
       )
     }
     
-    // Fetch the existing activity from the database
+    // Fetch the existing activity from the database to check ownership
     const existingActivity = await getActivityByIdWithReferences(activityId);
     if (!existingActivity) {
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    // Authorization check
+    // Authorization check - both admin and driver can update
+    // For drivers, check if the activity belongs to them
     if (session.user.role === "driver") {
       const userDriverId = session.user.id_driver || session.user.id;
       if (userDriverId === null || existingActivity.user.id !== userDriverId) {
@@ -135,39 +152,84 @@ export async function PUT(
       }
     }
     
-    // Parse form data
     const formData = await request.formData()
-    const body = JSON.parse(formData.get("data") as string || "{}")
+    
+    // Extract form fields
+    const tglValue = formData.get("tgl_berangkat") as string
+    const tgl_pulangValue = formData.get("tgl_pulang") as string
+    const id_ambulanValue = formData.get("id_ambulan") as string
+    const id_detailValue = formData.get("id_detail") as string
+    const jam_berangkatValue = formData.get("jam_berangkat") as string
+    const jam_pulangValue = formData.get("jam_pulang") as string
+    const id_driverValue = formData.get("id_driver") as string
+    const id_kantorValue = formData.get("id_kantor") as string
+    const asisten_luar_kotaValue = formData.get("asisten_luar_kota") as string
+    const areaValue = formData.get("area") as string
+    const dariValue = formData.get("dari") as string
+    const tujuanValue = formData.get("tujuan") as string
+    const km_awalValue = formData.get("km_awal") as string
+    const km_akhirValue = formData.get("km_akhir") as string
+    const biaya_antarValue = formData.get("biaya_antar") as string
+    const biaya_dibayarValue = formData.get("biaya_dibayar") as string
+    const id_pemesanValue = formData.get("id_pemesan") as string
+    const id_penerima_manfaatValue = formData.get("id_penerima_manfaat") as string
+    const infaqValue = formData.get("infaq") as string
+    const id_rewardValue = formData.get("id_reward") as string
+    const kegiatanValue = formData.get("kegiatan") as string
+    const rumpun_programValue = formData.get("rumpun_program") as string
+    
+    // Parse documentation to delete
+    let documentationToDelete: number[] = []
+    const documentationToDeleteValue = formData.get("documentationToDelete") as string
+    if (documentationToDeleteValue) {
+      try {
+        documentationToDelete = JSON.parse(documentationToDeleteValue)
+      } catch (e) {
+        console.error("Error parsing documentationToDelete:", e)
+      }
+    }
+    
     const documentationFiles = formData.getAll("documentation") as File[]
-    const existingDocumentation = formData.getAll("existingDocumentation") as string[]
     
-    console.log("Received body for update:", body);
+    console.log("Documentation files count:", documentationFiles.length);
+    console.log("Documentation to delete count:", documentationToDelete.length);
+    console.log("Activity ID for documentation:", activityId);
     
-    // Extract fields from body with proper type handling
-    const {
-      id_kantor,
-      tgl,
-      tgl_pulang,
-      id_ambulan,
-      id_detail,
-      jam_berangkat,
-      jam_pulang,
-      id_driver,
-      asisten_luar_kota,
-      area,
-      dari,
-      tujuan,
-      km_awal,
-      km_akhir,
-      biaya_antar,
-      biaya_dibayar,
-      id_pemesan,
-      id_penerima_manfaat,
-      infaq,
-      id_reward,
-      kegiatan = "pengantaran",
-      rumpun_program = "kesehatan"
-    } = body
+    // Log details about each documentation file
+    documentationFiles.forEach((file, index) => {
+      console.log(`Documentation file ${index}:`, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
+    });
+    
+    // Log existing documentation IDs
+    console.log("Existing documentation IDs:", documentationToDelete);
+    
+    // Extract fields from form data with proper type handling
+    const id_kantor = id_kantorValue ? parseInt(id_kantorValue) : undefined
+    const tgl_berangkat = tglValue
+    const tgl_pulang = tgl_pulangValue
+    const id_ambulan = id_ambulanValue ? parseInt(id_ambulanValue) : undefined
+    const id_detail = id_detailValue ? parseInt(id_detailValue) : undefined
+    const jam_berangkat = jam_berangkatValue
+    const jam_pulang = jam_pulangValue
+    const id_driver = id_driverValue ? parseInt(id_driverValue) : undefined
+    const asisten_luar_kota = asisten_luar_kotaValue
+    const area = areaValue
+    const dari = dariValue
+    const tujuan = tujuanValue
+    const km_awal = km_awalValue ? parseInt(km_awalValue) : undefined
+    const km_akhir = km_akhirValue ? parseInt(km_akhirValue) : undefined
+    const biaya_antar = biaya_antarValue ? parseInt(biaya_antarValue) : undefined
+    const biaya_dibayar = biaya_dibayarValue !== "" ? biaya_dibayarValue : undefined
+    const id_pemesan = id_pemesanValue ? parseInt(id_pemesanValue) : undefined
+    const id_penerima_manfaat = id_penerima_manfaatValue ? parseInt(id_penerima_manfaatValue) : undefined
+    const infaq = infaqValue !== "" ? infaqValue : undefined
+    const id_reward = id_rewardValue ? parseInt(id_rewardValue) : undefined
+    const kegiatan = kegiatanValue || "pengantaran"
+    const rumpun_program = rumpun_programValue || "kesehatan"
     
     // For server-side reconciliation, we only validate fields that are provided
     // If a field is not provided, we'll use the existing value from the database
@@ -175,9 +237,9 @@ export async function PUT(
     
     // Validate date if provided
     let sanitizedTgl = null
-    if (tgl !== undefined) {
-      sanitizedTgl = validateDateInput(tgl)
-      if (!sanitizedTgl) validationErrors.push("Tanggal")
+    if (tgl_berangkat !== undefined) {
+      sanitizedTgl = validateDateInput(tgl_berangkat)
+      if (!sanitizedTgl) validationErrors.push("Tanggal Berangkat")
     }
     
     // Validate id_ambulan if provided
@@ -314,16 +376,16 @@ export async function PUT(
     
     // Use sanitized values for database update
     const id_kantor_num = sanitizedIdKantor !== null ? sanitizedIdKantor : existingActivity.id_kantor
-    const tglValue = finalTgl
-    const tgl_pulangValue = sanitizedTglPulang || existingActivity.tgl_pulang || finalTgl
+    const tglValueFinal = finalTgl
+    const tgl_pulangValueFinal = sanitizedTglPulang || existingActivity.tgl_pulang || finalTgl
     const id_ambulan_num = finalIdAmbulan
     const id_detail_num = finalIdDetail
-    const jam_berangkatValue = finalJamBerangkat
-    const jam_pulangValue = sanitizedJamPulang || existingActivity.jam_pulang || finalJamBerangkat
+    const jam_berangkatValueFinal = finalJamBerangkat
+    const jam_pulangValueFinal = sanitizedJamPulang || existingActivity.jam_pulang || finalJamBerangkat
     const id_driver_num = sanitizedIdDriver !== null ? sanitizedIdDriver : existingActivity.id_driver
-    const areaValue = finalArea
-    const dariValue = finalDari
-    const tujuanValue = finalTujuan
+    const areaValueFinal = finalArea
+    const dariValueFinal = finalDari
+    const tujuanValueFinal = finalTujuan
     const km_awal_num = finalKmAwal
     const km_akhir_num = finalKmAkhir
     const selisih_km = finalSelisihKm
@@ -331,9 +393,9 @@ export async function PUT(
     const biaya_dibayar_num = sanitizedBiayaDibayar !== null ? sanitizedBiayaDibayar : existingActivity.biaya_dibayar
     const infaq_num = sanitizedInfaq !== null ? sanitizedInfaq : existingActivity.infaq
     const id_reward_num = sanitizedIdReward !== null ? sanitizedIdReward : existingActivity.id_reward
-    const kegiatanValue = sanitizedKegiatan || existingActivity.kegiatan || 'pengantaran'
-    const rumpun_programValue = sanitizedRumpunProgram || existingActivity.rumpun_program || 'kesehatan'
-    const asisten_luar_kotaValue = sanitizedAsistenLuarKota !== null ? sanitizedAsistenLuarKota : existingActivity.asisten_luar_kota
+    const kegiatanValueFinal = sanitizedKegiatan || existingActivity.kegiatan || 'pengantaran'
+    const rumpun_programValueFinal = sanitizedRumpunProgram || existingActivity.rumpun_program || 'kesehatan'
+    const asisten_luar_kotaValueFinal = sanitizedAsistenLuarKota !== null ? sanitizedAsistenLuarKota : existingActivity.asisten_luar_kota
     
     // Fetch required data from pemesan and penerima_manfaat tables if IDs were provided
     let pemesanData = null
@@ -426,49 +488,34 @@ export async function PUT(
 
       await sql`
         UPDATE ambulan_activity SET
-          "tgl" = ${tglValue},
-          "tgl_pulang" = ${tgl_pulangValue ? tgl_pulangValue : tglValue},
+          "tgl" = ${tglValueFinal},
+          "tgl_pulang" = ${tgl_pulangValueFinal ? tgl_pulangValueFinal : tglValueFinal},
           "bulan" = ${bulan},
           "tahun" = ${tahun},
           "id_ambulan" = ${id_ambulan_num},
           "id_detail" = ${id_detail_num},
-          "jam_berangkat" = ${jam_berangkatValue},
-          "jam_pulang" = ${jam_pulangValue ? jam_pulangValue : jam_berangkatValue},
+          "jam_berangkat" = ${jam_berangkatValueFinal},
+          "jam_pulang" = ${jam_pulangValueFinal ? jam_pulangValueFinal : jam_berangkatValueFinal},
           "id_driver" = ${id_driver_num},
           "asisten_luar_kota" = ${sanitizedAsisten},
-          "area" = ${areaValue},
+          "area" = ${areaValueFinal},
           "jml_hari_luar_kota" = ${jml_hari_luar_kota},
-          "dari" = ${dariValue},
-          "tujuan" = ${tujuanValue},
+          "dari" = ${dariValueFinal},
+          "tujuan" = ${tujuanValueFinal},
           "km_awal" = ${km_awal_num},
           "km_akhir" = ${km_akhir_num},
           "selisih_km" = ${selisih_km},
           "biaya_antar" = ${biaya_antar_num},
           "biaya_dibayar" = ${biaya_dibayar_num !== null ? biaya_dibayar_num : existingActivity.biaya_dibayar},
-          "nama_pemesan" = ${pemesanData ? pemesanData.nama_pemesan : (existingActivity.nama_pemesan || 'Tanpa Pemesan')},
-          "hp" = ${pemesanData ? pemesanData.hp : (existingActivity.hp || '000000000000')},
-          "nama_pm" = ${pmData ? pmData.nama_pm : (existingActivity.nama_pm || 'Tanpa PM')},
-          "alamat_pm" = ${pmData ? pmData.alamat_pm : (existingActivity.alamat_pm || 'Alamat tidak tersedia')},
-          "nik" = ${pmData ? pmData.nik : existingActivity.nik},
-          "no_kk" = ${pmData ? pmData.no_kk : existingActivity.no_kk},
-          "tempat_lahir" = ${pmData ? pmData.tempat_lahir : existingActivity.tempat_lahir},
-          "tgl_lahir" = ${pmData && pmData.tgl_lahir ? 
-            (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
-            existingActivity.tgl_lahir},
-          "jenis_kelamin_pm" = ${pmData ? pmData.jenis_kelamin_pm : (existingActivity.jenis_kelamin_pm || 'Tidak Diketahui')},
-          "usia_pm" = ${pmData && pmData.usia_pm !== null ? 
-            pmData.usia_pm.toString() : 
-            (existingActivity.usia_pm || '0')},
-          "id_asnaf" = ${pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : (existingActivity.id_asnaf || 1)},
+          "id_pemesan" = ${sanitizedIdPemesan !== null ? sanitizedIdPemesan : existingActivity.id_pemesan},
+          "id_penerima_manfaat" = ${sanitizedIdPenerimaManfaat !== null ? sanitizedIdPenerimaManfaat : existingActivity.id_penerima_manfaat},
           "status_layanan" = ${status_layanan},
           "pembatalan" = ${pembatalan},
           "keterbatasan" = ${keterbatasan},
           "infaq" = ${infaq_num !== null ? infaq_num : existingActivity.infaq},
           "id_reward" = ${id_reward_num !== null ? id_reward_num : existingActivity.id_reward},
-          "agama" = ${pmData ? pmData.agama : (existingActivity.agama || null)},
-          "status_marital" = ${pmData ? pmData.status_marital : (existingActivity.status_marital || null)},
-          "kegiatan" = ${kegiatanValue || existingActivity.kegiatan || 'pengantaran'},
-          "rumpun_program" = ${rumpun_programValue || existingActivity.rumpun_program || 'kesehatan'}
+          "kegiatan" = ${kegiatanValueFinal || existingActivity.kegiatan || 'pengantaran'},
+          "rumpun_program" = ${rumpun_programValueFinal || existingActivity.rumpun_program || 'kesehatan'}
         WHERE id = ${activityId}
       `
     } catch (dbError: any) {
@@ -489,55 +536,144 @@ export async function PUT(
       )
     }
     
-    // Process documentation files if any
-    if (documentationFiles && documentationFiles.length > 0) {
+    // Handle existing documentation - remove those that were deleted
+    if (documentationToDelete && Array.isArray(documentationToDelete)) {
       try {
-        console.log(`Processing ${documentationFiles.length} documentation files for activity ${activityId}`);
-        
-        // Process each documentation file
-        for (const file of documentationFiles) {
-          // Upload to Vercel Blob
-          const blob = await put(
-            `documentation/${activityId}/${file.name}`, 
-            file, 
-            { access: 'public' }
-          );
-          
-          // Save the URL to the database
-          await sql`
-            INSERT INTO dokumentasi_activity (activity_id, file_name, file_url, file_type, file_size)
-            VALUES (${activityId}, ${file.name}, ${blob.url}, ${file.type}, ${file.size})
-          `;
-        }
-      } catch (docError: any) {
-        console.error("Error processing documentation:", docError);
-        // We don't return an error here because the activity was successfully updated
-      }
-    }
-    
-    // Remove documentation that was deleted
-    if (existingDocumentation && existingDocumentation.length > 0) {
-      try {
-        const currentDocsResult = await sql`
-          SELECT id FROM dokumentasi_activity WHERE activity_id = ${activityId}
-        `;
-        
-        const currentDocIds = currentDocsResult.map((row: any) => row.id.toString());
-        const docsToKeep = existingDocumentation.filter((id: string) => currentDocIds.includes(id));
-        const docsToDelete = currentDocIds.filter((id: string) => !docsToKeep.includes(id));
-        
-        // Delete documentation that was removed
-        for (const docId of docsToDelete) {
-          await sql`
+        // Delete documentation that was marked for removal
+        for (const docId of documentationToDelete) {
+          await docSql`
             DELETE FROM dokumentasi_activity WHERE id = ${docId}
           `;
         }
+        console.log(`Deleted ${documentationToDelete.length} documentation records`);
       } catch (docError: any) {
-        console.error("Error removing documentation:", docError);
+        console.error("Error deleting documentation:", docError);
         // We don't return an error here because the activity was successfully updated
       }
     }
-    
+
+    // Process new documentation files if any - ONLY CREATE NEW FILES
+    if (documentationFiles && documentationFiles.length > 0) {
+      try {
+        console.log(`Processing ${documentationFiles.length} new documentation files for activity ${activityId}`);
+        
+        // Step 1: Upload all files to Vercel Blob first and collect URLs
+        const blobUrls: string[] = [];
+        
+        for (const file of documentationFiles) {
+          // Log file details for debugging
+          console.log("Processing file:", {
+            name: file.name,
+            size: file.size,
+            type: file.type
+          });
+          
+          // Upload to Vercel Blob with proper error handling
+          try {
+            const blob = await put(
+              `documentation/${activityId}/${file.name}`, 
+              file, 
+              { access: 'public', allowOverwrite: true }
+            );
+            console.log("Blob uploaded successfully:", blob.url);
+            blobUrls.push(blob.url);
+          } catch (uploadError: any) {
+            console.error("Error uploading to Vercel Blob:", uploadError);
+            throw new Error(`Failed to upload file ${file.name} to storage: ${uploadError.message}`);
+          }
+        }
+        
+        console.log("All new files uploaded. Blob URLs:", blobUrls);
+        
+        // Add a small delay to ensure blob is fully available
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Step 2: Insert all URLs into database
+        console.log("Inserting new documentation records into database...");
+        
+        // First, verify that the activity exists and get its details
+        let activityDetails;
+        try {
+          const activityCheck = await docSql`
+            SELECT id, tgl_pulang FROM ambulan_activity WHERE id = ${activityId}
+          `;
+          
+          if (activityCheck.length === 0) {
+            throw new Error(`Activity with ID ${activityId} does not exist`);
+          }
+          activityDetails = activityCheck[0];
+          console.log("Verified activity exists:", activityDetails);
+        } catch (activityCheckError: any) {
+          console.error("Error verifying activity existence:", activityCheckError);
+          throw new Error(`Failed to verify activity: ${activityCheckError.message}`);
+        }
+        
+        // Insert all documentation records using a transaction-like approach
+        const insertedRecords = [];
+        let hasError = false;
+        let errorMessage = "";
+        
+        for (const url of blobUrls) {
+          try {
+            console.log("Inserting documentation with values:", {
+              activityId: activityId,
+              url: url
+            });
+            
+            // Log the exact query we're about to execute
+            console.log("Executing query with parameters:", activityId, url);
+            
+            // Make sure the parameters are of the correct type
+            const typedActivityId = parseInt(activityId.toString());
+            const typedUrl = url.toString();
+            
+            console.log("Typed parameters:", typedActivityId, typedUrl);
+            
+            const insertResult = await docSql`
+              INSERT INTO dokumentasi_activity (id_activity, url)
+              VALUES (${typedActivityId}, ${typedUrl})
+              RETURNING id, id_activity, url, created_at
+            `;
+            console.log("Database insert successful:", insertResult);
+            insertedRecords.push(insertResult[0]);
+          } catch (dbError: any) {
+            console.error("Database insertion error:", dbError);
+            console.error("Error code:", dbError.code);
+            console.error("Error detail:", dbError.detail);
+            console.error("Error hint:", dbError.hint);
+            
+            // Log the exact query that failed
+            console.error("Failed query values:", {
+              activityId: activityId,
+              url: url
+            });
+            
+            hasError = true;
+            errorMessage = `Failed to save file record to database: ${dbError.message}`;
+            break; // Stop processing if any insert fails
+          }
+        }
+        
+        // If any insert failed, we should handle this appropriately
+        if (hasError) {
+          console.error("One or more database insertions failed:", errorMessage);
+          throw new Error(errorMessage);
+        }
+        
+        console.log("All new documentation records inserted successfully:", insertedRecords);
+      } catch (docError: any) {
+        console.error("Error processing new documentation:", docError);
+        // Return an error to the client so they know something went wrong
+        return NextResponse.json(
+          { 
+            error: "Failed to process new documentation", 
+            details: docError.message 
+          },
+          { status: 500 }
+        );
+      }
+    }
+
     return NextResponse.json({ id: activityId, message: "Activity updated successfully" })
   } catch (error: any) {
     console.error("Error updating activity:", error)
@@ -564,15 +700,19 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log("DELETE request received for activity ID:", params.id);
     const activityId = parseInt(params.id)
     
     // Validate activity ID
     if (isNaN(activityId) || activityId <= 0) {
+      console.log("Invalid activity ID:", params.id);
       return NextResponse.json(
         { error: "Invalid activity ID" },
         { status: 400 }
       )
     }
+    
+    console.log("Valid activity ID:", activityId);
     
     // Get session from cookies
     const cookieHeader = request.headers.get("cookie") || ""
@@ -581,6 +721,7 @@ export async function DELETE(
       .find((cookie) => cookie.startsWith("session="))
     
     if (!sessionCookie) {
+      console.log("No session cookie found");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -588,18 +729,28 @@ export async function DELETE(
     }
     
     const sessionToken = sessionCookie.split("=")[1]
+    console.log("Session token extracted");
+    
     const session = await getSession(sessionToken)
+    console.log("Session retrieved:", session ? "exists" : "null");
     
     if (!session) {
+      console.log("Invalid session");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       )
     }
     
+    console.log("User role:", session.user.role);
+    
     // Fetch the existing activity from the database to check ownership
+    console.log("Fetching activity with ID:", activityId);
     const existingActivity = await getActivityByIdWithReferences(activityId);
+    console.log("Existing activity:", existingActivity ? "found" : "not found");
+    
     if (!existingActivity) {
+      console.log("Activity not found with ID:", activityId);
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
@@ -607,22 +758,40 @@ export async function DELETE(
     // For drivers, check if the activity belongs to them
     if (session.user.role === "driver") {
       const userDriverId = session.user.id_driver || session.user.id;
+      console.log("Driver role check - userDriverId:", userDriverId, "activity.user.id:", existingActivity.user.id);
       if (userDriverId === null || existingActivity.user.id !== userDriverId) {
+        console.log("Forbidden access - driver ID mismatch");
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
     
-    // Delete the activity
-    await sql`
-      DELETE FROM ambulan_activity WHERE id = ${activityId}
-    `
+    console.log("About to delete activity with ID:", activityId);
     
-    return NextResponse.json({ message: "Activity deleted successfully" })
-  } catch (error) {
-    console.error("Error deleting activity:", error)
+    // First delete all documentation associated with this activity due to foreign key constraint
+    console.log("Deleting documentation for activity ID:", activityId);
+    const docDeleteResult = await sql`
+      DELETE FROM dokumentasi_activity WHERE id_activity = ${activityId}
+    `;
+    console.log("Documentation deletion result:", docDeleteResult);
+    
+    // Then delete the activity itself
+    console.log("Deleting activity with ID:", activityId);
+    const activityDeleteResult = await sql`
+      DELETE FROM ambulan_activity WHERE id = ${activityId}
+    `;
+    
+    console.log("Activity deletion result:", activityDeleteResult);
+    return NextResponse.json({ message: "Activity deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting activity:", error);
+    console.error("Error stack:", error.stack);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error",
+        message: error.message || "Unknown error",
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
-    )
+    );
   }
 }

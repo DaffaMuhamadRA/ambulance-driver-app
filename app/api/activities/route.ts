@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     // Extract fields from body with proper type handling
     const {
       id_kantor,
-      tgl,
+      tgl_berangkat, // Changed from tgl to tgl_berangkat
       tgl_pulang,
       id_ambulan,
       id_detail,
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     } = body
     
     // Validate and sanitize required fields
-    const sanitizedTgl = validateDateInput(tgl)
+    const sanitizedTgl = validateDateInput(tgl_berangkat) // Changed from tgl to tgl_berangkat
     const sanitizedIdAmbulan = validateNumericInput(id_ambulan)
     const sanitizedIdDetail = validateNumericInput(id_detail)
     // Handle time values that might include seconds (HH:MM:SS format)
@@ -230,29 +230,11 @@ export async function POST(request: Request) {
       selisih_km: selisih_km,
       biaya_antar: biaya_antar_num,
       biaya_dibayar: biaya_dibayar_num,
-      nama_pemesan: pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan',
-      hp: pemesanData ? pemesanData.hp : '000000000000',
-      nama_pm: pmData ? pmData.nama_pm : 'Tanpa PM',
-      alamat_pm: pmData ? pmData.alamat_pm : 'Alamat tidak tersedia',
-      nik: pmData ? pmData.nik : null,
-      no_kk: pmData ? pmData.no_kk : null,
-      tempat_lahir: pmData ? pmData.tempat_lahir : null,
-      // Convert date to string since it's VARCHAR in ambulan_activity table
-      tgl_lahir: pmData && pmData.tgl_lahir ? 
-        (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
-        null,
-      jenis_kelamin_pm: pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui',
-      // Convert usia_pm to string since it's VARCHAR in ambulan_activity table
-      usia_pm: pmData && pmData.usia_pm !== null ? 
-        pmData.usia_pm.toString() : 
-        '0',  // Default as string since it's VARCHAR and NOT NULL
-      // id_asnaf is INTEGER and NOT NULL
-      id_asnaf: pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1,
+      id_pemesan: sanitizedIdPemesan,
+      id_penerima_manfaat: sanitizedIdPenerimaManfaat,
       status_layanan,
       pembatalan,
       keterbatasan,
-      id_pemesan: sanitizedIdPemesan,
-      id_penerima_manfaat: sanitizedIdPenerimaManfaat,
       infaq: infaq_num,
       id_reward: id_reward_num,
       kegiatan: kegiatanValue,
@@ -284,21 +266,8 @@ export async function POST(request: Request) {
         selisih_km,
         biaya_antar_num,
         biaya_dibayar_num,
-        nama_pemesan: pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan',
-        hp: pemesanData ? pemesanData.hp : '000000000000',
-        nama_pm: pmData ? pmData.nama_pm : 'Tanpa PM',
-        alamat_pm: pmData ? pmData.alamat_pm : 'Alamat tidak tersedia',
-        nik: pmData ? pmData.nik : null,
-        no_kk: pmData ? pmData.no_kk : null,
-        tempat_lahir: pmData ? pmData.tempat_lahir : null,
-        tgl_lahir: pmData && pmData.tgl_lahir ? 
-          (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
-          null,
-        jenis_kelamin_pm: pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui',
-        usia_pm: pmData && pmData.usia_pm !== null ? 
-          pmData.usia_pm.toString() : 
-          '0',
-        id_asnaf: pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1,
+        id_pemesan: sanitizedIdPemesan,
+        id_penerima_manfaat: sanitizedIdPenerimaManfaat,
         status_layanan,
         pembatalan,
         keterbatasan,
@@ -306,8 +275,6 @@ export async function POST(request: Request) {
         id_reward_num,
         reward_driver: 0,
         reward_asisten: 0,
-        agama: pmData ? pmData.agama : null,
-        status_marital: pmData ? pmData.status_marital : null,
         kegiatanValue: kegiatanValue || 'pengantaran',
         rumpun_programValue: rumpun_programValue || 'kesehatan'
       });
@@ -339,17 +306,8 @@ export async function POST(request: Request) {
           "selisih_km",
           "biaya_antar",
           "biaya_dibayar",
-          "nama_pemesan",
-          "hp",
-          "nama_pm",
-          "alamat_pm",
-          "nik",
-          "no_kk",
-          "tempat_lahir",
-          "tgl_lahir",
-          "jenis_kelamin_pm",
-          "usia_pm",
-          "id_asnaf",
+          "id_pemesan",
+          "id_penerima_manfaat",
           "status_layanan",
           "pembatalan",
           "keterbatasan",
@@ -357,8 +315,6 @@ export async function POST(request: Request) {
           "id_reward",
           "reward_driver",
           "reward_asisten",
-          "agama",
-          "status_marital",
           "kegiatan",
           "rumpun_program",
           "tgl_insert"
@@ -384,21 +340,8 @@ export async function POST(request: Request) {
           ${selisih_km},
           ${biaya_antar_num},
           ${biaya_dibayar_num},
-          ${pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan'},
-          ${pemesanData ? pemesanData.hp : '000000000000'},
-          ${pmData ? pmData.nama_pm : 'Tanpa PM'},
-          ${pmData ? pmData.alamat_pm : 'Alamat tidak tersedia'},
-          ${pmData ? pmData.nik : null},
-          ${pmData ? pmData.no_kk : null},
-          ${pmData ? pmData.tempat_lahir : null},
-          ${pmData && pmData.tgl_lahir ? 
-            (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
-            null},
-          ${pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui'},
-          ${pmData && pmData.usia_pm !== null ? 
-            pmData.usia_pm.toString() : 
-            '0'},
-          ${pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1},
+          ${sanitizedIdPemesan},
+          ${sanitizedIdPenerimaManfaat},
           ${status_layanan},
           ${pembatalan},
           ${keterbatasan},
@@ -406,8 +349,6 @@ export async function POST(request: Request) {
           ${id_reward_num},
           ${0},
           ${0},
-          ${pmData ? pmData.agama : null},
-          ${pmData ? pmData.status_marital : null},
           ${kegiatanValue || 'pengantaran'},
           ${rumpun_programValue || 'kesehatan'},
           NOW()
@@ -447,7 +388,7 @@ export async function POST(request: Request) {
           const blob = await put(
             `documentation/${activityId}/${file.name}`, 
             file, 
-            { access: 'public' }
+            { access: 'public', allowOverwrite: true }
           );
           
           // Save the URL to the database

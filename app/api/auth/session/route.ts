@@ -17,7 +17,7 @@ export interface Session {
   id: number
   user_id: number
   session_token: string
-  expires_at: Date
+  expire_at: Date; // Changed from expires_at to expire_at to match database schema
 }
 
 // Get session by token
@@ -31,21 +31,37 @@ export async function getSession(token: string): Promise<(Session & { user: User
 
     const result = await sql`
       SELECT 
-        s.id, s.user_id, s.session_token, s.expires_at,
-        u.id as user_id, u.name, u.email, u.id_cms_privileges, u.status, u.photo, u.id_driver
+        s.id, s.user_id, s.session_token, s.expire_at,
+        u.id as user_id, u.name, u.email, u.id_cms_privileges, u.status, u.photo
       FROM sessions s
       JOIN cms_users u ON s.user_id = u.id
-      WHERE s.session_token = ${sanitizedToken} AND s.expires_at > NOW() AND u.status = 'Active'
+      WHERE s.session_token = ${sanitizedToken} AND s.expire_at > NOW() AND u.status = 'Active'
     `
 
     if (result.length === 0) return null
 
     const row = result[0]
+    
+    // For driver users, get their driver ID
+    let id_driver: number | undefined = undefined;
+    if (row.id_cms_privileges == 2) {
+      // This is a driver user, get their driver ID
+      const driverResult = await sql`
+        SELECT id 
+        FROM driver 
+        WHERE username = ${row.email}
+      `;
+      
+      if (driverResult.length > 0) {
+        id_driver = driverResult[0].id;
+      }
+    }
+    
     return {
       id: row.id,
       user_id: row.user_id,
       session_token: row.session_token,
-      expires_at: new Date(row.expires_at),
+      expire_at: new Date(row.expire_at), // Changed from expires_at to expire_at
       user: {
         id: row.user_id,
         name: row.name,
@@ -53,7 +69,7 @@ export async function getSession(token: string): Promise<(Session & { user: User
         role: row.id_cms_privileges == 1 ? "admin" : "driver",
         status: row.status,
         photo: row.photo,
-        id_driver: row.id_driver,
+        id_driver: id_driver, // Only set for drivers
       },
     }
   } catch (error) {
@@ -68,8 +84,11 @@ export async function GET() {
     const cookieStore = await cookies()
     const sessionToken = cookieStore.get("session")?.value
 
+    console.log("Session token from cookie:", sessionToken)
+
     // If no session token, return null user (not an error)
     if (!sessionToken) {
+      console.log("No session token found")
       return NextResponse.json({ user: null })
     }
 
@@ -77,17 +96,22 @@ export async function GET() {
     const sanitizedToken = validateStringInput(sessionToken, 255, 1);
     if (!sanitizedToken) {
       // Invalid token format, return null user
+      console.log("Invalid session token format")
       return NextResponse.json({ user: null })
     }
 
     const session = await getSession(sanitizedToken)
     
+    console.log("Session from database:", session)
+    
     // If session is invalid or expired, return null user
     if (!session) {
+      console.log("No valid session found in database")
       return NextResponse.json({ user: null })
     }
     
     // Valid session, return user
+    console.log("Valid session found, returning user:", session.user)
     return NextResponse.json({ user: session.user })
   } catch (error) {
     console.error("Error getting current user:", error)

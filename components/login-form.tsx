@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export default function LoginForm() {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -21,24 +21,35 @@ export default function LoginForm() {
     setError("")
 
     try {
+      console.log("Submitting login form with email:", email)
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: email, password }), // Use email as username
       })
 
+      console.log("Login response status:", response.status)
       const data = await response.json()
+      console.log("Login response data:", data)
 
       if (response.ok) {
         // Redirect based on user role
-        router.push(data.user.role === "admin" ? "/admin" : "/dashboard")
-        router.refresh()
+        const redirectPath = data.user.role === "admin" ? "/admin" : "/dashboard"
+        console.log("Login successful, redirecting to:", redirectPath)
+        
+        // Add a small delay to ensure cookies are set
+        setTimeout(() => {
+          router.push(redirectPath)
+          router.refresh()
+        }, 100)
       } else {
         setError(data.error || "Login gagal")
+        console.log("Login failed:", data.error)
       }
     } catch (error) {
+      console.error("Login error:", error)
       setError("Terjadi kesalahan. Silakan coba lagi.")
     } finally {
       setIsLoading(false)
@@ -50,19 +61,19 @@ export default function LoginForm() {
       {error && <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{error}</div>}
 
       <div>
-        <Label htmlFor="username" className="text-sm font-medium text-gray-700">
-          Username / Email
+        <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+          Email
         </Label>
         <Input
-          id="username"
-          name="username"
-          type="text"
-          autoComplete="username"
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
           required
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           className="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          placeholder="Masukkan username atau email"
+          placeholder="Masukkan email Anda"
         />
       </div>
 

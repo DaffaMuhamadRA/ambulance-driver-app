@@ -4,10 +4,10 @@
 // Neon database connection parameters
 // Using process.env directly for Edge Runtime compatibility
 const dbConfig = {
-  host: process.env.PGHOST || 'ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech',
+  host: process.env.PGHOST || 'ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech',
   database: process.env.PGDATABASE || 'neondb',
   user: process.env.PGUSER || 'neondb_owner',
-  password: process.env.PGPASSWORD || 'npg_26wQetjypolP',
+  password: process.env.PGPASSWORD || 'npg_vGgHE25STeCr',
   sslMode: process.env.PGSSLMODE || 'require',
   channelBinding: process.env.PGCHANNELBINDING || 'require'
 };

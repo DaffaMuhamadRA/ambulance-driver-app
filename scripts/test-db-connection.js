@@ -2,10 +2,10 @@
 const { neon } = require('@neondatabase/serverless');
 
 // Use the same configuration as in db.ts
-const PGHOST = process.env.PGHOST || 'ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech';
+const PGHOST = process.env.PGHOST || 'ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech';
 const PGDATABASE = process.env.PGDATABASE || 'neondb';
 const PGUSER = process.env.PGUSER || 'neondb_owner';
-const PGPASSWORD = process.env.PGPASSWORD || 'npg_26wQetjypolP';
+const PGPASSWORD = process.env.PGPASSWORD || 'npg_vGgHE25STeCr';
 const PGSSLMODE = process.env.PGSSLMODE || 'require';
 const PGCHANNELBINDING = process.env.PGCHANNELBINDING || 'require';
 

@@ -1,24 +1,38 @@
-// Simple test script to verify delete and refresh functionality
-const testDeleteRefresh = async () => {
-  try {
-    console.log("Testing delete and refresh functionality...");
-    
-    // This is just a simulation - in a real scenario, we would:
-    // 1. Delete an activity
-    // 2. Verify it's removed from the list
-    // 3. Confirm the UI updates correctly
-    
-    console.log("Delete and refresh functionality would work as follows:");
-    console.log("1. User clicks delete icon on an activity card");
-    console.log("2. Confirmation dialog appears");
-    console.log("3. If confirmed, DELETE request is sent to API");
-    console.log("4. On successful deletion, activity is removed from the list");
-    console.log("5. UI automatically refreshes to show updated activity list");
-    
-    console.log("\nFunctionality verified!");
-  } catch (error) {
-    console.error('Error testing delete and refresh functionality:', error);
-  }
-};
+require('dotenv').config();
+const { neon } = require('@neondatabase/serverless');
 
-testDeleteRefresh();
+const sql = neon(process.env.DATABASE_URL);
+
+async function testDelete() {
+  try {
+    console.log('Testing deletion of activity ID 6 with proper constraint handling...');
+    
+    // First check if activity exists
+    const checkResult = await sql`SELECT id FROM ambulan_activity WHERE id = 6`;
+    console.log('Activity 6 exists:', checkResult.length > 0);
+    
+    if (checkResult.length === 0) {
+      console.log('Activity 6 does not exist, nothing to delete');
+      process.exit(0);
+    }
+    
+    // First delete documentation
+    console.log('Deleting documentation for activity 6...');
+    const docDeleteResult = await sql`DELETE FROM dokumentasi_activity WHERE id_activity = 6`;
+    console.log('Documentation deleted:', docDeleteResult);
+    
+    // Then delete the activity
+    console.log('Deleting activity 6...');
+    const activityDeleteResult = await sql`DELETE FROM ambulan_activity WHERE id = 6`;
+    console.log('Activity deleted:', activityDeleteResult);
+    
+  } catch (error) {
+    console.error('Error:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error detail:', error.detail);
+  }
+  
+  process.exit(0);
+}
+
+testDelete();

@@ -18,6 +18,7 @@ export function useAuth() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
+        console.log("Fetching user session from:", `${BASE_URL}/api/auth/session`)
         const response = await fetch(`${BASE_URL}/api/auth/session`)
         
         // Check if the response is successful
@@ -29,7 +30,16 @@ export function useAuth() {
         }
         
         const data = await response.json()
-        setUser(data.user)
+        console.log("Session data received:", data)
+        
+        // Check if we have a user in the response
+        if (data.user) {
+          console.log("User authenticated:", data.user)
+          setUser(data.user)
+        } else {
+          console.log("No user in session data")
+          setUser(null)
+        }
       } catch (error) {
         console.error("Error fetching user:", error)
         // Set user to null in case of error

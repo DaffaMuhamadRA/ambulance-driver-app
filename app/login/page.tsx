@@ -10,8 +10,15 @@ export default function LoginPage() {
   const { user, loading } = useAuth()
 
   useEffect(() => {
+    console.log("Login page - user state:", user)
+    console.log("Login page - loading state:", loading)
+    
     if (!loading && user) {
-      router.push(user.role === "admin" ? "/admin" : "/dashboard")
+      console.log("User authenticated, redirecting to:", user.role === "admin" ? "/admin" : "/dashboard")
+      // Add a small delay to ensure everything is properly set
+      setTimeout(() => {
+        router.push(user.role === "admin" ? "/admin" : "/dashboard")
+      }, 100)
     }
   }, [user, loading, router])
 
@@ -25,6 +32,7 @@ export default function LoginPage() {
 
   // If user is already logged in, don't show the login page
   if (user) {
+    console.log("User already logged in, redirecting...")
     return null
   }
 

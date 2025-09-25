@@ -88,8 +88,8 @@ export default function CreateActivityPage() {
   // Form state
   const [formData, setFormData] = useState({
     id_kantor: isDriver ? "1" : "", // Default kantor for drivers
-    tgl: "",
-    tgl_pulang: "",
+    tgl_berangkat: "", // Changed from tgl to tgl_berangkat
+    tgl_pulang: "", // Keep tgl_pulang
     id_ambulan: "",
     id_detail: "",
     jam_berangkat: "",
@@ -230,25 +230,125 @@ export default function CreateActivityPage() {
     }
   }
 
-  // Automatically calculate biaya_antar when km_awal or km_akhir changes
-  useEffect(() => {
-    const kmAwal = parseInt(formData.km_awal) || 0
-    const kmAkhir = parseInt(formData.km_akhir) || 0
+  // Function to filter rewards based on time range
+  const getFilteredRewards = () => {
+    // If we don't have both jam berangkat and jam pulang, show all rewards
+    if (!formData.jam_berangkat || !formData.jam_pulang) {
+      return rewards;
+    }
+
+    const startHour = parseInt(formData.jam_berangkat.split(":")[0]);
+    const endHour = parseInt(formData.jam_pulang.split(":")[0]);
     
-    // Only calculate if both values are valid and km_akhir >= kmAwal
-    if (kmAwal >= 0 && kmAkhir >= 0 && kmAkhir >= kmAwal) {
-      const biaya = (kmAkhir - kmAwal) * 6000  // Changed from 3000 to 6000 Rupiah per kilometer
-      // Only update if the calculated value is different to prevent infinite loop
-      if (formData.biaya_antar !== biaya.toString()) {
-        setFormData(prev => ({
-          ...prev,
-          biaya_antar: biaya.toString()
-        }))
+    // Determine which time range the selected hours fall into
+    let validRewardTypes = new Set<string>();
+    
+    // Special case: Luar Kota
+    if (formData.area === "Luar Kota") {
+      validRewardTypes.add("luar kota");
+    } else {
+      // Saturday special case (14:50-23:00)
+      if (startHour === 14 && endHour === 23) {
+        validRewardTypes.add("Sabtu 14.50 sd 23.00");
+      }
+      // Regular time ranges
+      else if ((startHour >= 8 && startHour < 16) && (endHour >= 8 && endHour < 16)) {
+        validRewardTypes.add("Jam Pengantaran 08.00 - 16.00");
+      } else if ((startHour >= 16 && startHour < 22) && (endHour >= 16 && endHour < 22)) {
+        validRewardTypes.add("Jam Pengantaran 16.00 - 22.00");
+      } else if ((startHour >= 22 || startHour < 3) && (endHour >= 22 || endHour < 3)) {
+        validRewardTypes.add("Jam Pengantaran 22.00 - 03.00");
+      } else if ((startHour >= 3 && startHour < 8) && (endHour >= 3 && endHour < 8)) {
+        validRewardTypes.add("Jam Pengantaran 04.00 - 07.30");
+      } else {
+        // Default to Libur for irregular hours
+        validRewardTypes.add("Libur");
+      }
+      
+      // Always include special types
+      validRewardTypes.add("luar kota");
+      validRewardTypes.add("lain-lain");
+    }
+    
+    // Filter rewards based on jenis and valid reward types
+    const driverJenis = user?.role !== "admin" ? "karyawan" : null;
+    
+    return rewards.filter(reward => {
+      // For admin users, show all rewards
+      // For driver users, filter by driver status (karyawan/freelance)
+      const showReward = (user?.role === "admin") || 
+                        (user?.role === "driver" && reward.jenis === "karyawan");
+      
+      // If we should show this reward based on user role, check time range
+      if (showReward) {
+        // Always show special types regardless of time
+        if (reward.tipe === "luar kota" || reward.tipe === "lain-lain" || reward.tipe === "Libur") {
+          return true;
+        }
+        // Show only rewards that match the valid time range
+        return validRewardTypes.has(reward.tipe);
+      }
+      
+      return false;
+    });
+  };
+
+  // Automatically determine reward type based on driver status and time schedule
+  useEffect(() => {
+    // Only auto-select reward if we have all required data
+    if (!formData.jam_berangkat || !formData.jam_pulang) return;
+    
+    // Determine if driver is employee or freelance
+    // For drivers, check their status
+    // For admin, show all options
+    let driverJenis = "karyawan"; // Default to karyawan
+    
+    // If user is admin, we'll let them choose
+    // If user is driver, determine their status
+    if (user?.role !== "admin") {
+      // For now, we'll default to karyawan for all drivers
+      // In a more complete implementation, we would check the actual driver status
+      driverJenis = "karyawan";
+    }
+    
+    // Determine time-based reward type
+    let rewardType = "";
+    const startHour = parseInt(formData.jam_berangkat.split(":")[0]);
+    const endHour = parseInt(formData.jam_pulang.split(":")[0]);
+    
+    // Check for special cases first
+    if (formData.area === "Luar Kota") {
+      rewardType = "luar kota";
+    } else {
+      // Regular time-based rewards
+      if (startHour === 14 && endHour === 23) {
+        rewardType = "Sabtu 14.50 sd 23.00";
+      } else if ((startHour >= 8 && startHour < 16) && (endHour >= 8 && endHour < 16)) {
+        rewardType = "Jam Pengantaran 08.00 - 16.00";
+      } else if ((startHour >= 16 && startHour < 22) && (endHour >= 16 && endHour < 22)) {
+        rewardType = "Jam Pengantaran 16.00 - 22.00";
+      } else if ((startHour >= 22 || startHour < 3) && (endHour >= 22 || endHour < 3)) {
+        rewardType = "Jam Pengantaran 22.00 - 03.00";
+      } else if ((startHour >= 3 && startHour < 8) && (endHour >= 3 && endHour < 8)) {
+        rewardType = "Jam Pengantaran 04.00 - 07.30";
+      } else {
+        // Default to Libur for irregular hours
+        rewardType = "Libur";
       }
     }
-    // We intentionally exclude formData.biaya_antar from dependencies to avoid infinite loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.km_awal, formData.km_akhir])
+    
+    // Find matching reward
+    const matchingReward = rewards.find(
+      r => r.jenis === driverJenis && r.tipe === rewardType
+    );
+    
+    if (matchingReward) {
+      setFormData(prev => ({
+        ...prev,
+        id_reward: matchingReward.id.toString()
+      }));
+    }
+  }, [formData.jam_berangkat, formData.jam_pulang, formData.area, rewards, user?.role]);
 
   const handlePemesanSelect = (pemesan: Pemesan) => {
     setFormData(prev => ({
@@ -266,13 +366,11 @@ export default function CreateActivityPage() {
     setSelectedPM(pm)
   }
 
-  const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRewardChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value
-    // Temukan reward berdasarkan jenis dan tipe
-    const reward = rewards.find((r) => `${r.jenis} - ${r.tipe}` === value)
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      id_reward: reward ? reward.id.toString() : "",
+      id_reward: value
     }))
   }
 
@@ -375,13 +473,16 @@ export default function CreateActivityPage() {
     const errors: Record<string, boolean> = {}
     
     // Always required fields
-    if (!formData.tgl) errors.tgl = true
+    if (!formData.tgl_berangkat) errors.tgl_berangkat = true // Changed from tgl
+    if (!formData.tgl_pulang) errors.tgl_pulang = true
     if (!formData.id_ambulan) errors.id_ambulan = true
     if (!formData.id_detail) errors.id_detail = true
     if (!formData.jam_berangkat) errors.jam_berangkat = true
     if (!formData.jam_pulang) errors.jam_pulang = true
     if (!formData.dari) errors.dari = true
     if (!formData.tujuan) errors.tujuan = true
+    if (!formData.km_awal) errors.km_awal = true
+    if (!formData.km_akhir) errors.km_akhir = true
     
     // Required for admin users
     if (user?.role === "admin" && !formData.id_driver) errors.id_driver = true
@@ -474,44 +575,6 @@ export default function CreateActivityPage() {
       }
       
       const activityId = result.id
-
-      if (documentationFiles.length > 0) {
-        setUploadingFiles(true)
-
-        // Upload files to blob storage
-        const formData = new FormData()
-        documentationFiles.forEach((file) => {
-          formData.append("files", file)
-        })
-
-        const uploadResponse = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (uploadResponse.ok) {
-          const uploadResult = await uploadResponse.json()
-          
-          // Check if uploadResult has the expected files property
-          if (uploadResult && uploadResult.files) {
-            // Save documentation records to database
-            await fetch("/api/activities/dokumentasi", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                activityId: activityId,
-                files: uploadResult.files,
-              }),
-            })
-          } else {
-            console.warn("Upload result does not contain expected files property:", uploadResult)
-          }
-        }
-
-        setUploadingFiles(false)
-      }
 
       // Show alert modal instead of alert()
       setAlertModalTitle("Berhasil")
@@ -616,19 +679,35 @@ export default function CreateActivityPage() {
               </div>
             )}
 
-            {/* Tanggal */}
+            {/* Tanggal Berangkat */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Tanggal</label>
+              <label className="block text-sm font-medium text-gray-700">Tanggal Berangkat</label>
               <input
                 type="date"
-                name="tgl"
-                value={formData.tgl}
+                name="tgl_berangkat"
+                value={formData.tgl_berangkat}
                 onChange={handleInputChange}
-                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tgl ? 'border-red-500' : 'border-gray-300'}`}
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tgl_berangkat ? 'border-red-500' : 'border-gray-300'}`}
                 required
               />
-              {validationErrors.tgl && (
-                <p className="mt-1 text-sm text-red-600">Tanggal wajib diisi</p>
+              {validationErrors.tgl_berangkat && (
+                <p className="mt-1 text-sm text-red-600">Tanggal berangkat wajib diisi</p>
+              )}
+            </div>
+
+            {/* Tanggal Pulang */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Tanggal Pulang</label>
+              <input
+                type="date"
+                name="tgl_pulang"
+                value={formData.tgl_pulang}
+                onChange={handleInputChange}
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tgl_pulang ? 'border-red-500' : 'border-gray-300'}`}
+                required
+              />
+              {validationErrors.tgl_pulang && (
+                <p className="mt-1 text-sm text-red-600">Tanggal pulang wajib diisi</p>
               )}
             </div>
 
@@ -733,46 +812,6 @@ export default function CreateActivityPage() {
             )}
             {user?.role !== "admin" && user && <input type="hidden" name="id_driver" value={user.id} />}
 
-            {/* Jenis (Reward) - Diubah menjadi textbox */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Jenis</label>
-              <input
-                type="text"
-                name="jenis"
-                value={
-                  rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))
-                    ? `${rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))?.jenis} - ${rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))?.tipe}`
-                    : ""
-                }
-                onChange={handleRewardChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                list="reward-options"
-                placeholder="Pilih atau ketik jenis reward"
-              />
-              <datalist id="reward-options">
-                {rewards.map((reward) => (
-                  <option key={reward.id} value={`${reward.jenis} - ${reward.tipe}`} />
-                ))}
-              </datalist>
-            </div>
-
-            {/* Reward (dalam Rupiah) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Reward (Rp)</label>
-              <input
-                type="text"
-                name="reward_value"
-                value={
-                  rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))?.reward
-                    ? `Rp ${rewards.find((r) => r.id === Number.parseInt(formData.id_reward || "0"))?.reward?.toLocaleString("id-ID")}`
-                    : ""
-                }
-                readOnly
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                placeholder="Pilih jenis reward terlebih dahulu"
-              />
-            </div>
-
             {/* Asisten Luar Kota */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Asisten Luar Kota</label>
@@ -788,42 +827,46 @@ export default function CreateActivityPage() {
             {/* Area */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Area</label>
-              <input
-                type="text"
+              <select
                 name="area"
                 value={formData.area}
                 onChange={handleInputChange}
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-              />
+              >
+                <option value="Dalam Kota">Dalam Kota</option>
+                <option value="Luar Kota">Luar Kota</option>
+              </select>
             </div>
 
             {/* Dari */}
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700">Dari</label>
-              <textarea
+              <input
+                type="text"
                 name="dari"
                 value={formData.dari}
                 onChange={handleInputChange}
-                rows={2}
                 className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.dari ? 'border-red-500' : 'border-gray-300'}`}
+                required
               />
               {validationErrors.dari && (
-                <p className="mt-1 text-sm text-red-600">Field 'Dari' wajib diisi</p>
+                <p className="mt-1 text-sm text-red-600">Dari wajib diisi</p>
               )}
             </div>
 
             {/* Tujuan */}
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700">Tujuan</label>
-              <textarea
+              <input
+                type="text"
                 name="tujuan"
                 value={formData.tujuan}
                 onChange={handleInputChange}
-                rows={2}
                 className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tujuan ? 'border-red-500' : 'border-gray-300'}`}
+                required
               />
               {validationErrors.tujuan && (
-                <p className="mt-1 text-sm text-red-600">Field 'Tujuan' wajib diisi</p>
+                <p className="mt-1 text-sm text-red-600">Tujuan wajib diisi</p>
               )}
             </div>
 
@@ -835,8 +878,12 @@ export default function CreateActivityPage() {
                 name="km_awal"
                 value={formData.km_awal}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.km_awal ? 'border-red-500' : 'border-gray-300'}`}
+                required
               />
+              {validationErrors.km_awal && (
+                <p className="mt-1 text-sm text-red-600">KM awal wajib diisi</p>
+              )}
             </div>
 
             {/* KM Akhir */}
@@ -847,30 +894,63 @@ export default function CreateActivityPage() {
                 name="km_akhir"
                 value={formData.km_akhir}
                 onChange={handleInputChange}
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.km_akhir ? 'border-red-500' : 'border-gray-300'}`}
+                required
+              />
+              {validationErrors.km_akhir && (
+                <p className="mt-1 text-sm text-red-600">KM akhir wajib diisi</p>
+              )}
+            </div>
+
+            {/* Biaya Antar - Editable for all users */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Biaya Antar</label>
+              <input
+                type="number"
+                name="biaya_antar"
+                value={formData.biaya_antar}
+                onChange={handleInputChange}
                 className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
             </div>
-            
-            {/* Biaya Antar - Read-only for drivers, auto-calculated */}
+
+            {/* Jenis Pengantaran - Moved to correct position */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Biaya Antar</label>
-              {isDriver ? (
-                <input
-                  type="number"
-                  name="biaya_antar"
-                  value={formData.biaya_antar}
-                  readOnly
-                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                />
-              ) : (
-                <input
-                  type="number"
-                  name="biaya_antar"
-                  value={formData.biaya_antar}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                />
-              )}
+              <label className="block text-sm font-medium text-gray-700">Jenis Pengantaran</label>
+              <select
+                name="id_reward"
+                value={formData.id_reward}
+                onChange={handleRewardChange}
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+              >
+                <option value="">Pilih Jenis Pengantaran</option>
+                {getFilteredRewards().map((reward) => {
+                  // For admin users, show all rewards
+                  // For driver users, filter by driver status (karyawan/freelance)
+                  const showReward = (user?.role === "admin") || 
+                                   (user?.role === "driver" && reward.jenis === "karyawan");
+                  return showReward && (
+                    <option key={reward.id} value={reward.id}>
+                      {reward.jenis} - {reward.tipe}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Reward - Read-only field showing the reward value */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Reward</label>
+              <input
+                type="text"
+                value={
+                  formData.id_reward 
+                    ? rewards.find(r => r.id === parseInt(formData.id_reward))?.reward?.toLocaleString('id-ID') || ""
+                    : ""
+                }
+                readOnly
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+              />
             </div>
 
             {/* Biaya yang Dibayar */}
@@ -885,13 +965,13 @@ export default function CreateActivityPage() {
               />
             </div>
             
-            {/* Nama Pemesan - Live Search */}
+            {/* Nama Pemesan - Live Search (single line display) */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
               <LiveSearchInput
                 items={pemesans}
                 onSelect={handlePemesanSelect}
-                onAutoFill={handlePemesanSelect} // Add auto-fill functionality
+                onAutoFill={handlePemesanSelect}
                 placeholder="Cari atau ketik nama pemesan/no HP"
                 displayKey="nama_pemesan"
                 searchKeys={["nama_pemesan", "hp"]}
@@ -903,7 +983,7 @@ export default function CreateActivityPage() {
             {selectedPemesan && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
+                  <label className="block text-sm font-medium text-gray-700">Detail Nama Pemesan</label>
                   <input
                     type="text"
                     value={selectedPemesan.nama_pemesan || "Tidak ada data"}
@@ -912,7 +992,7 @@ export default function CreateActivityPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">No HP</label>
+                  <label className="block text-sm font-medium text-gray-700">Detail No HP Pemesan</label>
                   <input
                     type="text"
                     value={selectedPemesan.hp || "Tidak ada data"}
@@ -929,7 +1009,7 @@ export default function CreateActivityPage() {
               <LiveSearchInput
                 items={penerimaManfaats}
                 onSelect={handlePMSelect}
-                onAutoFill={handlePMSelect} // Add auto-fill functionality
+                onAutoFill={handlePMSelect}
                 placeholder="Cari atau ketik nama PM"
                 displayKey="nama_pm"
                 searchKeys={["nama_pm"]}
@@ -962,7 +1042,11 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Jenis Kelamin</label>
                   <input
                     type="text"
-                    value={selectedPM.jenis_kelamin_pm || "Tidak ada data"}
+                    value={
+                      selectedPM?.jenis_kelamin_pm === 'l' ? 'Laki Laki' :
+                      selectedPM?.jenis_kelamin_pm === 'p' ? 'Perempuan' :
+                      selectedPM?.jenis_kelamin_pm || "Tidak ada data"
+                    }
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1011,7 +1095,15 @@ export default function CreateActivityPage() {
                   <label className="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
                   <input
                     type="text"
-                    value={selectedPM.tgl_lahir || "Tidak ada data"}
+                    value={
+                      selectedPM?.tgl_lahir 
+                        ? new Date(selectedPM.tgl_lahir).toLocaleDateString('id-ID', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })
+                        : "Tidak ada data"
+                    }
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />

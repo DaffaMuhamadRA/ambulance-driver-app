@@ -4,49 +4,54 @@ import { useState, useEffect } from "react"
 import { X, Download, Eye, FileText, ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+// Define the documentation interface to match the actual data structure
 interface Documentation {
   id: number
-  activity_id: number
-  file_name: string
-  file_url: string
-  file_type: string
-  file_size: number
-  uploaded_at: string
+  url: string
+  created_at: string
+  id_activity?: number // Optional as it might not be present in all cases
 }
 
 interface DocumentationGalleryProps {
   activityId: number
+  documentation?: Documentation[]
+  onRemove?: (id: number) => void // Optional callback for removing documentation
+  editable?: boolean // Flag to indicate if the gallery is editable
 }
 
-export default function DocumentationGallery({ activityId }: DocumentationGalleryProps) {
-  const [documentation, setDocumentation] = useState<Documentation[]>([])
+export default function DocumentationGallery({ 
+  activityId, 
+  documentation, 
+  onRemove,
+  editable = false 
+}: DocumentationGalleryProps) {
+  const [localDocumentation, setLocalDocumentation] = useState<Documentation[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchDocumentation()
-  }, [activityId])
+    // If documentation is provided as prop, use it directly
+    if (documentation) {
+      setLocalDocumentation(documentation)
+      setLoading(false)
+    } else {
+      // Otherwise fetch from API
+      fetchDocumentation()
+    }
+  }, [activityId, documentation])
 
   const fetchDocumentation = async () => {
     try {
       const response = await fetch(`/api/activities/dokumentasi?activityId=${activityId}`)
       if (response.ok) {
         const data = await response.json()
-        setDocumentation(data.dokumentasi || [])
+        setLocalDocumentation(data)
       }
     } catch (error) {
       console.error("Error fetching documentation:", error)
     } finally {
       setLoading(false)
     }
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
   const formatDate = (dateString: string) => {
@@ -59,12 +64,14 @@ export default function DocumentationGallery({ activityId }: DocumentationGaller
     })
   }
 
-  const isImage = (fileType: string) => {
-    return fileType.startsWith("image/")
+  const isImage = (url: string) => {
+    // Simple check based on file extension
+    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
+    return imageExtensions.some(ext => url.toLowerCase().includes(ext))
   }
 
-  const getFileIcon = (fileType: string) => {
-    if (isImage(fileType)) {
+  const getFileIcon = (url: string) => {
+    if (isImage(url)) {
       return <ImageIcon className="w-5 h-5" />
     }
     return <FileText className="w-5 h-5" />
@@ -77,7 +84,7 @@ export default function DocumentationGallery({ activityId }: DocumentationGaller
       const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = downloadUrl
-      link.download = filename
+      link.download = filename || `document-${Date.now()}`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -95,7 +102,8 @@ export default function DocumentationGallery({ activityId }: DocumentationGaller
     )
   }
 
-  if (documentation.length === 0) {
+  // Only show "Tidak ada dokumentasi" message when not in edit mode and there's no documentation
+  if (localDocumentation.length === 0 && !editable) {
     return (
       <div className="text-center py-8 text-gray-500">
         <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -104,52 +112,39 @@ export default function DocumentationGallery({ activityId }: DocumentationGaller
     )
   }
 
+  // If in edit mode and no documentation, still show the component for adding new documentation
+  if (localDocumentation.length === 0 && editable) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+        <p>Belum ada dokumentasi. Tambahkan dokumentasi baru menggunakan form di atas.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Dokumentasi Aktivitas</h3>
 
-      {/* Image Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-        {documentation
-          .filter((doc) => isImage(doc.file_type))
-          .map((doc) => (
-            <div key={doc.id} className="relative group">
-              <div
-                className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => setSelectedImage(doc.file_url)}
-              >
-                <img
-                  src={doc.file_url || "/placeholder.svg"}
-                  alt={doc.file_name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
-                <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-          ))}
-      </div>
-
       {/* File List */}
       <div className="space-y-3">
-        {documentation.map((doc) => (
+        {localDocumentation.map((doc) => (
           <div key={doc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center space-x-3">
-              <div className="text-gray-500">{getFileIcon(doc.file_type)}</div>
+              <div className="text-gray-500">{getFileIcon(doc.url)}</div>
               <div>
-                <p className="text-sm font-medium text-gray-900">{doc.file_name}</p>
+                <p className="text-sm font-medium text-gray-900">Document {doc.id}</p>
                 <p className="text-xs text-gray-500">
-                  {formatFileSize(doc.file_size)} • {formatDate(doc.uploaded_at)}
+                  {formatDate(doc.created_at)}
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {isImage(doc.file_type) && (
+              {isImage(doc.url) && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedImage(doc.file_url)}
+                  onClick={() => setSelectedImage(doc.url)}
                   className="text-blue-600 hover:text-blue-700"
                 >
                   <Eye className="w-4 h-4" />
@@ -158,11 +153,21 @@ export default function DocumentationGallery({ activityId }: DocumentationGaller
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleDownload(doc.file_url, doc.file_name)}
+                onClick={() => handleDownload(doc.url, `document-${doc.id}`)}
                 className="text-green-600 hover:text-green-700"
               >
                 <Download className="w-4 h-4" />
               </Button>
+              {editable && onRemove && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRemove(doc.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           </div>
         ))}

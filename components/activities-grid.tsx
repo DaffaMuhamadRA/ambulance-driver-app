@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import type { Activity } from "@/lib/activities"
+import type { DashboardActivity as Activity } from "@/lib/activities"  // Changed to DashboardActivity
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
@@ -42,10 +42,10 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
   // Filter activities based on search term
   const filteredActivities = currentActivities.filter(
     (activity) =>
-      activity.detail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.dari.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.tujuan.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.ambulance.nopol.toLowerCase().includes(searchTerm.toLowerCase()),
+      (activity.detail || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (activity.dari || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (activity.tujuan || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (activity.ambulance.nopol || "").toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const totalPages = Math.ceil(filteredActivities.length / itemsPerPage)
@@ -150,56 +150,56 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
   }
 
   const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) return
     
     // Show confirmation modal instead of confirm()
     setDeleteAction(() => performBulkDelete)
     setConfirmModalOpen(true)
-  };
+  }
 
   const performBulkDelete = async () => {
     try {
       // Delete each selected activity
       const deletePromises = Array.from(selectedIds).map(id => {
-        const apiEndpoint = isAdmin ? `/api/admin/activities/${id}` : `/api/activities/${id}`;
+        const apiEndpoint = isAdmin ? `/api/admin/activities/${id}` : `/api/activities/${id}`
         return fetch(apiEndpoint, {
           method: 'DELETE',
-        });
-      });
+        })
+      })
       
-      const responses = await Promise.all(deletePromises);
-      const failedDeletes = responses.filter(response => !response.ok);
+      const responses = await Promise.all(deletePromises)
+      const failedDeletes = responses.filter(response => !response.ok)
       
       if (failedDeletes.length === 0) {
         // All deletions successful
         // Remove the deleted activities from the current activities list
         setCurrentActivities(prevActivities => 
           prevActivities.filter(activity => !selectedIds.has(activity.id))
-        );
+        )
         
         // Clear selection
-        setSelectedIds(new Set());
+        setSelectedIds(new Set())
         
         // Reset to first page if we're on an empty page
         if (displayedActivities.length === selectedIds.size && currentPage > 1) {
-          setCurrentPage(1);
+          setCurrentPage(1)
         }
       } else {
         // Show alert modal instead of alert()
         setAlertModalTitle("Gagal Menghapus")
-        setAlertModalMessage(`Gagal menghapus ${failedDeletes.length} dari ${selectedIds.size} aktivitas.`);
+        setAlertModalMessage(`Gagal menghapus ${failedDeletes.length} dari ${selectedIds.size} aktivitas.`)
         setAlertModalType("error")
         setAlertModalOpen(true)
       }
     } catch (error) {
-      console.error("Error deleting activities:", error);
+      console.error("Error deleting activities:", error)
       // Show alert modal instead of alert()
       setAlertModalTitle("Kesalahan")
-      setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas");
+      setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas")
       setAlertModalType("error")
       setAlertModalOpen(true)
     }
-  };
+  }
 
   const handleCardClick = (activityId: number) => {
     router.push(`/activities/${activityId}?page=${currentPage}`)
@@ -295,15 +295,15 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
           </Button>
           <div className="flex space-x-1">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum;
+              let pageNum
               if (totalPages <= 5) {
-                pageNum = i + 1;
+                pageNum = i + 1
               } else if (currentPage <= 3) {
-                pageNum = i + 1;
+                pageNum = i + 1
               } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
+                pageNum = totalPages - 4 + i
               } else {
-                pageNum = currentPage - 2 + i;
+                pageNum = currentPage - 2 + i
               }
 
               return (
@@ -318,7 +318,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
                 >
                   {pageNum}
                 </button>
-              );
+              )
             })}
           </div>
           <span className="font-medium text-gray-600">
@@ -337,7 +337,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
         {displayedActivities.map((activity) => {
-          const styles = getDetailStyles(activity.detail)
+          const styles = getDetailStyles(activity.detail || "")
           const isSelected = selectedIds.has(activity.id)
 
           return (
@@ -351,8 +351,8 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
               >
                 <div className="flex justify-between items-start mb-1">
                   <div>
-                    <p className="text-gray-500 text-xs">{formatDate(activity.tgl_berangkat)}</p>
-                    <p className="font-bold text-gray-800 text-sm">{activity.ambulance.nopol}</p>
+                    <p className="text-gray-500 text-xs">{formatDate(activity.tgl_berangkat || "")}</p>
+                    <p className="font-bold text-gray-800 text-sm">{activity.ambulance.nopol || ""}</p>
                   </div>
                   <input
                     type="checkbox"
@@ -366,26 +366,26 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
                 <div className="grid grid-cols-2 gap-2 text-xs mb-2">
                   <div>
                     <p className="font-medium text-gray-900">Dari:</p>
-                    <p className="text-gray-700 truncate">{activity.dari}</p>
+                    <p className="text-gray-700 truncate">{activity.dari || ""}</p>
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">Tujuan:</p>
-                    <p className="text-gray-700 truncate">{activity.tujuan}</p>
+                    <p className="text-gray-700 truncate">{activity.tujuan || ""}</p>
                   </div>
                 </div>
               </div>
               <div className="bg-gray-50 px-3 py-2 flex items-center justify-between rounded-b-lg border-t border-gray-200">
-                <span className={`px-2 py-1 text-xs font-bold rounded-full ${styles.badge}`}>{activity.detail}</span>
+                <span className={`px-2 py-1 text-xs font-bold rounded-full ${styles.badge}`}>{activity.detail || ""}</span>
                 <div className="flex items-center space-x-1">
                   <div className="text-xs text-gray-600 mr-2">
-                    {formatTime(activity.jam_berangkat)} - {formatTime(activity.jam_pulang)}
+                    {formatTime(activity.jam_berangkat || "")} - {formatTime(activity.jam_pulang || "")}
                   </div>
                   <button
                     className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
                     title="Lihat Detail"
                     onClick={(e) => {
-                      e.stopPropagation();
-                      handleCardClick(activity.id);
+                      e.stopPropagation()
+                      handleCardClick(activity.id)
                     }}
                   >
                     <svg
@@ -409,7 +409,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
                       className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
                       title="Edit"
                       onClick={(e) => {
-                        e.stopPropagation();
+                        e.stopPropagation()
                       }}
                     >
                       <svg
@@ -433,8 +433,8 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
                     className="p-1.5 rounded-md text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors"
                     title="Hapus"
                     onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(activity.id);
+                      e.stopPropagation()
+                      handleDelete(activity.id)
                     }}
                   >
                     <svg
@@ -482,15 +482,15 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
           </Button>
           <div className="flex space-x-1">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum;
+              let pageNum
               if (totalPages <= 5) {
-                pageNum = i + 1;
+                pageNum = i + 1
               } else if (currentPage <= 3) {
-                pageNum = i + 1;
+                pageNum = i + 1
               } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
+                pageNum = totalPages - 4 + i
               } else {
-                pageNum = currentPage - 2 + i;
+                pageNum = currentPage - 2 + i
               }
 
               return (
@@ -505,7 +505,7 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
                 >
                   {pageNum}
                 </button>
-              );
+              )
             })}
           </div>
           <span className="font-medium text-gray-600">

@@ -1,38 +1,50 @@
-// Test login functionality
-import fetch from 'node-fetch';
+// Test script to verify the login functionality
+const http = require('http');
 
-async function testLogin() {
-  try {
-    console.log('Testing login API with driver user...');
-    
-    const response = await fetch('http://localhost:3001/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: 'Agus Setiawan',
-        password: '123456'
-      })
-    });
-    
-    console.log(`Login Status: ${response.status}`);
-    console.log(`Login Status Text: ${response.statusText}`);
-    
-    const data = await response.json();
-    console.log('Login Response:', JSON.stringify(data, null, 2));
-    
-    // Test session API
-    console.log('\nTesting session API...');
-    const sessionResponse = await fetch('http://localhost:3001/api/auth/session');
-    console.log(`Session Status: ${sessionResponse.status}`);
-    console.log(`Session Status Text: ${sessionResponse.statusText}`);
-    
-    const sessionData = await sessionResponse.json();
-    console.log('Session Response:', JSON.stringify(sessionData, null, 2));
-  } catch (error) {
-    console.error('Error:', error.message);
+// Test data
+const postData = JSON.stringify({
+  username: 'admin@crudbooster.com',
+  password: '123456'
+});
+
+// Options for the request
+const options = {
+  hostname: 'localhost',
+  port: 3001,
+  path: '/api/auth/login',
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(postData)
   }
-}
+};
 
-testLogin();
+// Make the request
+const req = http.request(options, (res) => {
+  console.log(`Status: ${res.statusCode}`);
+  console.log(`Headers: ${JSON.stringify(res.headers)}`);
+  
+  let data = '';
+  
+  res.on('data', (chunk) => {
+    data += chunk;
+  });
+  
+  res.on('end', () => {
+    console.log('Response body:', data);
+    try {
+      const jsonData = JSON.parse(data);
+      console.log('Parsed JSON:', jsonData);
+    } catch (error) {
+      console.error('Failed to parse JSON response:', error);
+    }
+  });
+});
+
+req.on('error', (error) => {
+  console.error('Request error:', error);
+});
+
+// Write data to request body
+req.write(postData);
+req.end();
