@@ -16,7 +16,7 @@ interface FileUploadProps {
 export default function FileUpload({
   onFilesChange,
   maxFiles = 5,
-  acceptedTypes = ["image/*", ".pdf", ".doc", ".docx"],
+  acceptedTypes = ["image/*"],
 }: FileUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [dragActive, setDragActive] = useState(false)
@@ -99,7 +99,7 @@ export default function FileUpload({
             Pilih File
           </Button>
           <p className="mt-2 text-sm text-gray-500">atau drag & drop file di sini</p>
-          <p className="text-xs text-gray-400 mt-1">Maksimal {maxFiles} file (Gambar, PDF, DOC)</p>
+          <p className="text-xs text-gray-400 mt-1">Maksimal {maxFiles} file (Gambar saja)</p>
         </div>
         <input
           ref={fileInputRef}

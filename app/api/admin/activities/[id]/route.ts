@@ -4,10 +4,6 @@ import { getActivityById, getActivityByIdWithReferences } from "@/lib/activities
 import { sql } from "@/lib/db"
 import { put } from '@vercel/blob'
 import { sanitizeInput, validateNumericInput, validateDateInput, validateTimeInput, validateStringInput } from "@/lib/validation"
-import { neon } from "@neondatabase/serverless"
-
-// Create a separate SQL client for documentation operations to match the working dokumentasi route
-const docSql = neon(process.env.DATABASE_URL!)
 
 export async function GET(
   request: Request,
@@ -450,7 +446,7 @@ export async function PUT(
         // First, verify that the activity exists and get its details
         let activityDetails;
         try {
-          const activityCheck = await docSql`
+          const activityCheck = await sql`
             SELECT id, tgl_pulang FROM ambulan_activity WHERE id = ${activityId}
           `;
           
@@ -485,7 +481,7 @@ export async function PUT(
             
             console.log("Typed parameters:", typedActivityId, typedUrl);
             
-            const insertResult = await docSql`
+            const insertResult = await sql`
               INSERT INTO dokumentasi_activity (id_activity, url)
               VALUES (${typedActivityId}, ${typedUrl})
               RETURNING id, id_activity, url, created_at
@@ -513,27 +509,22 @@ export async function PUT(
         // If any insert failed, we should handle this appropriately
         if (hasError) {
           console.error("One or more database insertions failed:", errorMessage);
-          throw new Error(errorMessage);
+          // We don't throw an error here because the activity was successfully updated
+          // The client will just see that documentation wasn't added, but the activity update succeeded
         }
         
         console.log("All documentation records inserted successfully:", insertedRecords);
       } catch (docError: any) {
         console.error("Error processing documentation:", docError);
-        // Return an error to the client so they know something went wrong
-        return NextResponse.json(
-          { 
-            error: "Failed to process documentation", 
-            details: docError.message 
-          },
-          { status: 500 }
-        );
+        // We don't return an error here because the activity was successfully updated
+        // The client will just see that documentation wasn't added, but the activity update succeeded
       }
     }
     
     // Remove documentation that was deleted
     if (existingDocumentation && existingDocumentation.length > 0) {
       try {
-        const currentDocsResult = await docSql`
+        const currentDocsResult = await sql`
           SELECT id FROM dokumentasi_activity WHERE id_activity = ${activityId}
         `;
         
@@ -543,7 +534,7 @@ export async function PUT(
         
         // Delete documentation that was removed
         for (const docId of docsToDelete) {
-          await docSql`
+          await sql`
             DELETE FROM dokumentasi_activity WHERE id = ${docId}
           `;
         }

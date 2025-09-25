@@ -1170,7 +1170,7 @@ export default function CreateActivityPage() {
               <FileUpload
                 onFilesChange={setDocumentationFiles}
                 maxFiles={5}
-                acceptedTypes={["image/*", ".pdf", ".doc", ".docx"]}
+                acceptedTypes={["image/*"]}
               />
             </div>
           </div>

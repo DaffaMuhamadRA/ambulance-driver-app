@@ -1324,7 +1324,7 @@ export default function EditActivityPage({ params }: { params: { id: string } })
             <FileUpload
               onFilesChange={setDocumentationFiles}
               maxFiles={5}
-              acceptedTypes={["image/*", ".pdf", ".doc", ".docx"]}
+              acceptedTypes={["image/*"]}
             />
             
             {/* Existing Documentation Gallery */}
