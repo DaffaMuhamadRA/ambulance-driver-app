@@ -10,12 +10,12 @@ Aplikasi ini sudah dikonfigurasi untuk menggunakan database Neon PostgreSQL yang
 
 **Kredensial Database Neon**:
 ```
-PGHOST=ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech
-PGDATABASE=neondb
-PGUSER=neondb_owner
-PGPASSWORD=npg_26wQetjypolP
-PGSSLMODE=require
-PGCHANNELBINDING=require
+PGHOST='ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech'
+PGDATABASE='neondb'
+PGUSER='neondb_owner'
+PGPASSWORD='npg_vGgHE25STeCr'
+PGSSLMODE='require'
+PGCHANNELBINDING='require'
 ```
 
 ### Menggunakan Database Lokal (PostgreSQL)
@@ -38,13 +38,13 @@ Jika ingin menggunakan database lokal:
 3. Comment konfigurasi database Neon:
    ```
    # Untuk database Neon PostgreSQL
-   # PGHOST=ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech
-   # PGDATABASE=neondb
-   # PGUSER=neondb_owner
-   # PGPASSWORD=npg_26wQetjypolP
-   # PGSSLMODE=require
-   # PGCHANNELBINDING=require
-   # DATABASE_URL=postgresql://neondb_owner:npg_26wQetjypolP@ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+   # PGHOST='ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech'
+   # PGDATABASE='neondb'
+   # PGUSER='neondb_owner'
+   # PGPASSWORD='npg_vGgHE25STeCr'
+   # PGSSLMODE='require'
+   # PGCHANNELBINDING='require'
+   # DATABASE_URL=postgresql://neondb_owner:npg_vGgHE25STeCr@ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
    ```
 
 4. Buat database di PostgreSQL:
@@ -100,20 +100,16 @@ Database Neon sudah berisi data pengguna yang dapat digunakan:
 
 1. **Admin User**:
    - Username: `admin`
-   - Email: `admin@example.com`
-   - Password: `password`
+   - Email: `admin@crudbooster.com`
+   - Password: `123456`
    - Role: `admin`
 
 2. **Driver Users**:
    - Username: `aep.saepudin`
    - Email: `aep@citasehat.com`
-   - Password: `password`
+   - Password: `123456`
    - Role: `driver`
    
-   - Username: `joko.s`
-   - Email: `joko.s@example.com`
-   - Password: `password`
-   - Role: `driver`
 
 **Catatan**: Database Neon mungkin berisi lebih banyak pengguna dengan berbagai email dan kredensial. Gunakan kredensial yang sesuai dengan data yang ada di database.
 
@@ -175,10 +171,10 @@ For detailed information about the security implementation, see [SECURITY_IMPLEM
 2. **Konfigurasi Environment Variables**:
    Setelah import, tambahkan environment variables berikut di Vercel dashboard:
    ```
-   PGHOST=ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech
+   PGHOST= ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech
    PGDATABASE=neondb
    PGUSER=neondb_owner
-   PGPASSWORD=npg_26wQetjypolP
+   PGPASSWORD=npg_vGgHE25STeCr
    PGSSLMODE=require
    PGCHANNELBINDING=require
    ```
@@ -210,17 +206,17 @@ Jika mengalami masalah saat deployment:
 
 Jalankan server development:
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Bangun aplikasi untuk produksi:
 ```bash
-npm run build
+pnpm build
 ```
 
 Jalankan server produksi:
 ```bash
-npm start
+pnpm start
 ```
 
 ### Dynamic Base URL Configuration
