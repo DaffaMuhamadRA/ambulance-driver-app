@@ -9,6 +9,7 @@ import DashboardLayout from "@/components/dashboard-layout"
 import ConfirmationModal from "@/components/confirmation-modal"
 import AlertModal from "@/components/alert-modal"
 import DocumentationGallery from "@/components/documentation-gallery"
+import { formatDisplayDate } from "@/lib/timezone"
 
 interface Activity {
   id: number
@@ -73,6 +74,8 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
   const [alertModalTitle, setAlertModalTitle] = useState("")
   const [alertModalMessage, setAlertModalMessage] = useState("")
   const [alertModalType, setAlertModalType] = useState<"info" | "success" | "warning" | "error">("info")
+  // Loading state for delete operation
+  const [deleting, setDeleting] = useState(false)
   
   const activityId = parseInt(params.id)
   const page = searchParams.get('page') // Get the page parameter from URL
@@ -123,13 +126,7 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
   }
   
   const formatDate = (dateString: string) => {
-    if (!dateString) return "-"
-    return new Date(dateString).toLocaleDateString("id-ID", {
-      timeZone: "Asia/Jakarta", // GMT + 7
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
+    return formatDisplayDate(dateString);
   }
 
   const formatTime = (timeString: string) => {
@@ -146,6 +143,8 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
     try {
       // Close the modal first
       setConfirmModalOpen(false);
+      // Set deleting state to true to show loading animation
+      setDeleting(true);
       
       const response = await fetch(`/api/activities/${activityId}`, {
         method: 'DELETE',
@@ -169,6 +168,9 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
       setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas")
       setAlertModalType("error")
       setAlertModalOpen(true)
+    } finally {
+      // Reset deleting state
+      setDeleting(false);
     }
   }
 
@@ -217,6 +219,16 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
 
   return (
     <DashboardLayout user={user}>
+      {/* Show loading overlay when deleting */}
+      {deleting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+            <p className="text-gray-700">Menghapus aktivitas...</p>
+          </div>
+        </div>
+      )}
+      
       <div className="pb-4 border-b border-gray-200">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-3">
@@ -273,6 +285,7 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                   variant="outline" 
                   className="flex items-center gap-2"
                   onClick={handleDelete}
+                  disabled={deleting}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -535,6 +548,7 @@ export default function ActivityDetailPage({ params }: { params: { id: string } 
                 variant="outline" 
                 className="w-full flex items-center justify-center gap-2"
                 onClick={handleDelete}
+                disabled={deleting}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

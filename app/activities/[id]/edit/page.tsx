@@ -9,6 +9,8 @@ import LiveSearchInput from "@/components/live-search-input"
 import FileUpload from "@/components/file-upload"
 import AlertModal from "@/components/alert-modal"
 import DocumentationGallery from "@/components/documentation-gallery"
+import { formatDisplayDate } from "@/lib/timezone"
+import { FileIcon, X, RotateCcw } from "lucide-react"
 
 // Interface definitions
 interface Kantor {
@@ -140,6 +142,15 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   const [documentationFiles, setDocumentationFiles] = useState<File[]>([])
   const [existingDocumentation, setExistingDocumentation] = useState<Array<{id: number, url: string, created_at?: string}>>([])
   const [documentationToDelete, setDocumentationToDelete] = useState<number[]>([])
+  
+  // New state for tracking newly uploaded files that can be removed before saving
+  const [newDocumentationFiles, setNewDocumentationFiles] = useState<File[]>([])
+  
+  // New state for soft deleted documentation (hidden with undo option)
+  const [softDeletedDocumentation, setSoftDeletedDocumentation] = useState<number[]>([])
+  
+  // Keep a reference to all documentation for undo functionality
+  const [allDocumentation, setAllDocumentation] = useState<Array<{id: number, url: string, created_at?: string}>>([])
 
   // Check if user is a driver
   const isDriver = user?.role !== "admin";
@@ -271,11 +282,13 @@ export default function EditActivityPage({ params }: { params: { id: string } })
 
         // Set existing documentation
         if (activity.documentation) {
-          setExistingDocumentation(activity.documentation.map((doc: any) => ({
+          const docs = activity.documentation.map((doc: any) => ({
             id: doc.id,
             url: doc.url,
             created_at: doc.created_at
-          })));
+          }));
+          setExistingDocumentation(docs);
+          setAllDocumentation(docs); // Keep a reference to all documentation
         }
 
         // Set reference data
@@ -547,20 +560,41 @@ export default function EditActivityPage({ params }: { params: { id: string } })
   const handleDocumentationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files)
-      setDocumentationFiles(prev => [...prev, ...files])
+      setNewDocumentationFiles(prev => [...prev, ...files])
     }
   }
   
-  const removeDocumentationFile = (index: number) => {
-    setDocumentationFiles(prev => prev.filter((_, i) => i !== index))
+  const removeNewDocumentationFile = (index: number) => {
+    setNewDocumentationFiles(prev => prev.filter((_, i) => i !== index))
   }
   
   const removeExistingDocumentation = (id: number) => {
-    // Add to deletion list
-    setDocumentationToDelete(prev => [...prev, id])
+    // Add to soft deletion list instead of immediate deletion
+    setSoftDeletedDocumentation(prev => [...prev, id])
     
     // Remove from existing documentation display
     setExistingDocumentation(prev => prev.filter(doc => doc.id !== id))
+  }
+  
+  // New function to undo soft deletion
+  const undoDeleteDocumentation = (id: number) => {
+    // Remove from soft deletion list
+    setSoftDeletedDocumentation(prev => prev.filter(docId => docId !== id))
+    
+    // Find the document in allDocumentation and add it back to existingDocumentation
+    const docToAddBack = allDocumentation.find(doc => doc.id === id);
+    if (docToAddBack) {
+      setExistingDocumentation(prev => [...prev, docToAddBack])
+    }
+  }
+  
+  // New function to handle bulk deletion
+  const removeSelectedDocumentation = (ids: number[]) => {
+    // Add all selected documents to soft deletion list
+    setSoftDeletedDocumentation(prev => [...prev, ...ids])
+    
+    // Remove from existing documentation display
+    setExistingDocumentation(prev => prev.filter(doc => !ids.includes(doc.id)))
   }
   
   const handlePemesanSelect = (pemesan: Pemesan | null) => {
@@ -689,13 +723,13 @@ export default function EditActivityPage({ params }: { params: { id: string } })
         submitData.append(key, value as string)
       })
       
-      // Add documentation to delete
-      if (documentationToDelete.length > 0) {
-        submitData.append('documentationToDelete', JSON.stringify(documentationToDelete))
+      // Add documentation to delete (soft deleted documentation)
+      if (softDeletedDocumentation.length > 0) {
+        submitData.append('documentationToDelete', JSON.stringify(softDeletedDocumentation))
       }
       
       // Add new documentation files
-      documentationFiles.forEach((file) => {
+      newDocumentationFiles.forEach((file) => {
         submitData.append('documentation', file)
       })
       
@@ -1237,11 +1271,7 @@ export default function EditActivityPage({ params }: { params: { id: string } })
                     type="text"
                     value={
                       selectedPM?.tgl_lahir 
-                        ? new Date(selectedPM.tgl_lahir).toLocaleDateString('id-ID', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })
+                        ? formatDisplayDate(selectedPM.tgl_lahir)
                         : "Tidak ada data"
                     }
                     readOnly
@@ -1322,14 +1352,13 @@ export default function EditActivityPage({ params }: { params: { id: string } })
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">Dokumentasi Aktivitas</label>
             <FileUpload
-              onFilesChange={setDocumentationFiles}
+              onFilesChange={setNewDocumentationFiles}
               maxFiles={5}
               acceptedTypes={["image/*"]}
             />
             
             {/* Existing Documentation Gallery */}
             <div className="mt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Dokumentasi yang Sudah Ada:</h4>
               <DocumentationGallery 
                 activityId={activityId}
                 documentation={existingDocumentation.map(doc => ({
@@ -1339,12 +1368,10 @@ export default function EditActivityPage({ params }: { params: { id: string } })
                 }))}
                 onRemove={removeExistingDocumentation}
                 editable={true}
+                softDeletedDocumentation={softDeletedDocumentation}
+                onUndoDelete={undoDeleteDocumentation}
+                onDeleteSelected={removeSelectedDocumentation}
               />
-              {documentationToDelete.length > 0 && (
-                <div className="mt-2 text-sm text-red-600">
-                  {documentationToDelete.length} file akan dihapus saat menyimpan perubahan
-                </div>
-              )}
             </div>
           </div>
           

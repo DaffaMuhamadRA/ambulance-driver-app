@@ -108,8 +108,8 @@ export default function ConfirmationModal({
               className={`inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm ${confirmButtonClass}`}
               onClick={() => {
                 onConfirm();
-                // Only close the modal after the confirm action
-                // onClose is also called in the activity page after performDelete
+                // Close the modal after the confirm action
+                onClose();
               }}
             >
               {confirmText}

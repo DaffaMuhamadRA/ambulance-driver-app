@@ -42,9 +42,15 @@ export function getBaseUrl(): string {
   return 'http://localhost:3000';
 }
 
+// Timezone configuration
+export const TIMEZONE = process.env.TZ || 'Asia/Jakarta';
+export const TIMEZONE_OFFSET = '+07:00';
+
 // Export the base URL as a constant
 export const BASE_URL = getBaseUrl();
 
 export default {
   BASE_URL,
+  TIMEZONE,
+  TIMEZONE_OFFSET,
 };

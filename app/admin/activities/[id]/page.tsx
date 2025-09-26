@@ -8,6 +8,8 @@ import Link from "next/link"
 import DashboardLayout from "@/components/dashboard-layout"
 import ConfirmationModal from "@/components/confirmation-modal"
 import AlertModal from "@/components/alert-modal"
+import DocumentationGallery from "@/components/documentation-gallery"
+import { formatDisplayDate } from "@/lib/timezone"
 
 interface Activity {
   id: number
@@ -52,6 +54,11 @@ interface Activity {
     id: number
     name: string
   }
+  documentation?: Array<{
+    id: number
+    url: string
+    created_at: string
+  }>
 }
 
 export default function AdminActivityDetailPage({ params }: { params: { id: string } }) {
@@ -67,6 +74,8 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
   const [alertModalTitle, setAlertModalTitle] = useState("")
   const [alertModalMessage, setAlertModalMessage] = useState("")
   const [alertModalType, setAlertModalType] = useState<"info" | "success" | "warning" | "error">("info")
+  // Loading state for delete operation
+  const [deleting, setDeleting] = useState(false)
   
   const activityId = parseInt(params.id)
   const page = searchParams.get('page')
@@ -117,13 +126,7 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
   }
   
   const formatDate = (dateString: string) => {
-    if (!dateString) return "-"
-    return new Date(dateString).toLocaleDateString("id-ID", {
-      timeZone: "Asia/Jakarta", // GMT + 7
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
+    return formatDisplayDate(dateString);
   }
 
   const formatTime = (timeString: string) => {
@@ -138,6 +141,11 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
 
   const performDelete = async () => {
     try {
+      // Close the modal first
+      setConfirmModalOpen(false);
+      // Set deleting state to true to show loading animation
+      setDeleting(true);
+      
       const response = await fetch(`/api/admin/activities/${activityId}`, {
         method: 'DELETE',
       });
@@ -159,6 +167,9 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
       setAlertModalMessage("Terjadi kesalahan saat menghapus aktivitas");
       setAlertModalType("error")
       setAlertModalOpen(true)
+    } finally {
+      // Reset deleting state
+      setDeleting(false);
     }
   }
 
@@ -208,6 +219,16 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
 
   return (
     <DashboardLayout user={user}>
+      {/* Show loading overlay when deleting */}
+      {deleting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+            <p className="text-gray-700">Menghapus aktivitas...</p>
+          </div>
+        </div>
+      )}
+      
       <div className="pb-4 border-b border-gray-200">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-3">
@@ -264,6 +285,7 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
                   variant="outline" 
                   className="flex items-center gap-2"
                   onClick={handleDelete}
+                  disabled={deleting}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -492,6 +514,25 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
                   <h3 className="text-sm font-medium text-gray-500">Agama</h3>
                   <p className="mt-1 text-sm text-gray-900">{activity.agama || "-"}</p>
                 </div>
+                
+                {/* Documentation Section */}
+                <div className="col-span-1 md:col-span-2">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Dokumentasi</h3>
+                  {activity.documentation && activity.documentation.length > 0 ? (
+                    <DocumentationGallery 
+                      activityId={activity.id}
+                      documentation={activity.documentation.map(doc => ({
+                        id: doc.id,
+                        url: doc.url,
+                        created_at: doc.created_at
+                      }))}
+                      onRemove={() => {}} // No remove functionality in detail view
+                      editable={false}
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">Tidak ada dokumentasi untuk aktivitas ini</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -522,6 +563,7 @@ export default function AdminActivityDetailPage({ params }: { params: { id: stri
                   variant="outline" 
                   className="w-full flex items-center justify-center gap-2"
                   onClick={handleDelete}
+                  disabled={deleting}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

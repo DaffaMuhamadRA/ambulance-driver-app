@@ -1,5 +1,6 @@
-import { sql } from "@/lib/db";
-import { User } from "@/lib/auth";
+import { sql } from "@/lib/db"
+import { formatInputDate } from "@/lib/timezone"
+import { User } from "@/lib/auth"
 
 // Original Activity interface for database operations
 export interface Activity {
@@ -412,47 +413,12 @@ export async function getActivityByIdWithReferences(id: number): Promise<Detaile
     console.log("Documentation result length:", documentationResult.length);
     
     // Format tanggal untuk input HTML (YYYY-MM-DD) using GMT + 7
-    const formatDateForInput = (dateValue: any) => {
-      // Handle null or undefined
-      if (!dateValue) return "";
-      
-      try {
-        let date;
-        
-        // If it's already a Date object, use it directly
-        if (dateValue instanceof Date) {
-          date = dateValue;
-        } else {
-          // Parse the string date
-          date = new Date(dateValue);
-        }
-        
-        // Check if date is valid
-        if (isNaN(date.getTime())) {
-          console.warn("Invalid date value:", dateValue);
-          return "";
-        }
-        
-        // For HTML date inputs, we want to use the GMT + 7 date to match the detail views
-        // Convert to GMT + 7 and get the date part
-        const gmtPlus7Date = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-        const year = gmtPlus7Date.getFullYear();
-        const month = String(gmtPlus7Date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
-        const day = String(gmtPlus7Date.getDate()).padStart(2, '0');
-        
-        return `${year}-${month}-${day}`;
-      } catch (error) {
-        console.error("Error formatting date for input:", dateValue, error);
-        return "";
-      }
-    };
-    
-    // Add error handling for date formatting
+    // Using the new utility function
     let tgl_berangkat = "";
     let tgl_pulang = "";
     
     try {
-      tgl_berangkat = formatDateForInput(row.tgl_berangkat);
+      tgl_berangkat = formatInputDate(row.tgl_berangkat);
       console.log("Formatted tgl_berangkat:", tgl_berangkat);
     } catch (error) {
       console.error("Error formatting tgl_berangkat:", error);
@@ -478,7 +444,7 @@ export async function getActivityByIdWithReferences(id: number): Promise<Detaile
     }
     
     try {
-      tgl_pulang = formatDateForInput(row.tgl_pulang);
+      tgl_pulang = formatInputDate(row.tgl_pulang);
       console.log("Formatted tgl_pulang:", tgl_pulang);
     } catch (error) {
       console.error("Error formatting tgl_pulang:", error);
@@ -543,7 +509,7 @@ export async function getActivityByIdWithReferences(id: number): Promise<Detaile
       id_kantor: row.id_kantor,
       id_ambulan: row.id_ambulan,
       id_detail: row.id_detail,
-      id_driver: row.id_driver,
+      id_driver: row.driver_id,  // Fixed: was row.id_driver, now row.driver_id
       id_pemesan: row.id_pemesan,
       id_penerima_manfaat: row.id_penerima_manfaat,
       id_reward: row.id_reward,

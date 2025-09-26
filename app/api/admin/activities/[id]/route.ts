@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getSession } from "@/app/api/auth/session/route"
 import { getActivityById, getActivityByIdWithReferences } from "@/lib/activities"
 import { sql } from "@/lib/db"
-import { put } from '@vercel/blob'
+import { put, del } from '@vercel/blob'
 import { sanitizeInput, validateNumericInput, validateDateInput, validateTimeInput, validateStringInput } from "@/lib/validation"
 
 export async function GET(
@@ -126,42 +126,24 @@ export async function PUT(
     
     // Parse form data
     const formData = await request.formData()
-    console.log("Received form data keys:", Array.from(formData.keys()));
     
-    // Log all form data for debugging
+    // Extract all form fields directly from formData
+    const body: Record<string, any> = {};
     for (const [key, value] of formData.entries()) {
-      if (value instanceof File) {
-        console.log(`Form data entry - ${key}: File(${value.name}, ${value.size} bytes)`);
-      } else {
-        console.log(`Form data entry - ${key}:`, value);
+      // Skip file fields as they are handled separately
+      if (!(value instanceof File)) {
+        body[key] = value;
       }
     }
     
-    const body = JSON.parse(formData.get("data") as string || "{}")
     const documentationFiles = formData.getAll("documentation") as File[]
-    const existingDocumentation = formData.getAll("existingDocumentation") as string[]
-    
-    console.log("Documentation files count:", documentationFiles.length);
-    console.log("Existing documentation count:", existingDocumentation.length);
-    
-    // Log details about each documentation file
-    documentationFiles.forEach((file, index) => {
-      console.log(`Documentation file ${index}:`, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
-    });
-    
-    // Log existing documentation IDs
-    console.log("Existing documentation IDs:", existingDocumentation);
-    
-    console.log("Received body for update:", body);
+    const documentationToDelete = formData.get("documentationToDelete") ? 
+      JSON.parse(formData.get("documentationToDelete") as string) : []
     
     // Extract fields from body with proper type handling
     const {
       id_kantor,
-      tgl,
+      tgl_berangkat,
       tgl_pulang,
       id_ambulan,
       id_detail,
@@ -184,6 +166,9 @@ export async function PUT(
       rumpun_program = "kesehatan"
     } = body
     
+    // Map tgl_berangkat to tgl for consistency with database schema
+    const tgl = tgl_berangkat;
+    
     // Validate and sanitize required fields
     const sanitizedTgl = validateDateInput(tgl)
     const sanitizedIdAmbulan = validateNumericInput(id_ambulan)
@@ -198,13 +183,17 @@ export async function PUT(
     const sanitizedArea = validateStringInput(area)
     const sanitizedDari = validateStringInput(dari, 100)
     const sanitizedTujuan = validateStringInput(tujuan, 100)
+    
+    // Removed validation for km_awal, km_akhir, biaya_antar, and id_driver
+    // These fields are now optional as requested
+    // For admin users, id_driver should be set to NULL as it is not required
     const sanitizedKmAwal = validateNumericInput(km_awal, 0)
     const sanitizedKmAkhir = validateNumericInput(km_akhir, 0)
     const sanitizedBiayaAntar = validateNumericInput(biaya_antar, 0)
+    const sanitizedIdDriver = validateNumericInput(id_driver)
     
     if (!sanitizedTgl || !sanitizedIdAmbulan || !sanitizedIdDetail || !sanitizedJamBerangkat || 
-        !sanitizedArea || !sanitizedDari || !sanitizedTujuan || !sanitizedKmAwal || !sanitizedKmAkhir || 
-        !sanitizedBiayaAntar) {
+        !sanitizedArea || !sanitizedDari || !sanitizedTujuan) {
       return NextResponse.json(
         { error: "Invalid or missing required fields" },
         { status: 400 }
@@ -224,10 +213,10 @@ export async function PUT(
       sanitizedJamPulang = validateTimeInput(jamPulangValue)
     }
     const sanitizedIdKantor = validateNumericInput(id_kantor)
-    const sanitizedIdDriver = validateNumericInput(id_driver)
     const sanitizedAsistenLuarKota = asisten_luar_kota ? validateStringInput(asisten_luar_kota, 100) : null
     const sanitizedKmAkhirNum = sanitizedKmAkhir
-    const sanitizedSelisihKm = sanitizedKmAkhirNum - sanitizedKmAwal
+    // Handle null values for KM calculations
+    const sanitizedSelisihKm = sanitizedKmAwal !== null && sanitizedKmAkhirNum !== null ? sanitizedKmAkhirNum - sanitizedKmAwal : 0
     const sanitizedBiayaDibayar = biaya_dibayar ? validateNumericInput(biaya_dibayar, 0) : null
     const sanitizedIdPemesan = id_pemesan ? validateNumericInput(id_pemesan) : null
     const sanitizedIdPenerimaManfaat = id_penerima_manfaat ? validateNumericInput(id_penerima_manfaat) : null
@@ -236,8 +225,8 @@ export async function PUT(
     const sanitizedKegiatan = validateStringInput(kegiatan, 50) || "pengantaran"
     const sanitizedRumpunProgram = validateStringInput(rumpun_program, 50) || "kesehatan"
     
-    // Additional validation
-    if (sanitizedSelisihKm < 0) {
+    // Additional validation - only check if both KM values are provided
+    if (sanitizedKmAwal !== null && sanitizedKmAkhirNum !== null && sanitizedSelisihKm < 0) {
       return NextResponse.json(
         { error: "KM akhir cannot be less than KM awal" },
         { status: 400 }
@@ -349,43 +338,28 @@ export async function PUT(
           "id_detail" = ${id_detail_num},
           "jam_berangkat" = ${jam_berangkatValue},
           "jam_pulang" = ${jam_pulangValue ? jam_pulangValue : jam_berangkatValue},
-          "id_driver" = ${id_driver_num},
+          "id_driver" = ${sanitizedIdDriver},
           "asisten_luar_kota" = ${sanitizedAsisten},
           "area" = ${areaValue},
           "jml_hari_luar_kota" = ${jml_hari_luar_kota},
           "dari" = ${dariValue},
           "tujuan" = ${tujuanValue},
-          "km_awal" = ${km_awal_num},
-          "km_akhir" = ${km_akhir_num},
-          "selisih_km" = ${selisih_km},
-          "biaya_antar" = ${biaya_antar_num},
+          "km_awal" = ${km_awal_num !== null ? km_awal_num : null},
+          "km_akhir" = ${km_akhir_num !== null ? km_akhir_num : null},
+          "selisih_km" = ${selisih_km !== null ? selisih_km : null},
+          "biaya_antar" = ${biaya_antar_num !== null ? biaya_antar_num : null},
           "biaya_dibayar" = ${biaya_dibayar_num},
-          "nama_pemesan" = ${pemesanData ? pemesanData.nama_pemesan : 'Tanpa Pemesan'},
-          "hp" = ${pemesanData ? pemesanData.hp : '000000000000'},
-          "nama_pm" = ${pmData ? pmData.nama_pm : 'Tanpa PM'},
-          "alamat_pm" = ${pmData ? pmData.alamat_pm : 'Alamat tidak tersedia'},
-          "nik" = ${pmData ? pmData.nik : null},
-          "no_kk" = ${pmData ? pmData.no_kk : null},
-          "tempat_lahir" = ${pmData ? pmData.tempat_lahir : null},
-          "tgl_lahir" = ${pmData && pmData.tgl_lahir ? 
-            (new Date(pmData.tgl_lahir).toISOString().split('T')[0]) : 
-            null},
-          "jenis_kelamin_pm" = ${pmData ? pmData.jenis_kelamin_pm : 'Tidak Diketahui'},
-          "usia_pm" = ${pmData && pmData.usia_pm !== null ? 
-            pmData.usia_pm.toString() : 
-            '0'},
-          "id_asnaf" = ${pmData && pmData.id_asnaf !== null ? pmData.id_asnaf : 1},
+          "id_pemesan" = ${sanitizedIdPemesan},
+          "id_penerima_manfaat" = ${sanitizedIdPenerimaManfaat},
           "status_layanan" = ${status_layanan},
           "pembatalan" = ${pembatalan},
           "keterbatasan" = ${keterbatasan},
           "infaq" = ${infaq_num},
           "id_reward" = ${id_reward_num},
-          "agama" = ${pmData ? pmData.agama : null},
-          "status_marital" = ${pmData ? pmData.status_marital : null},
           "kegiatan" = ${kegiatanValue || 'pengantaran'},
           "rumpun_program" = ${rumpun_programValue || 'kesehatan'}
         WHERE id = ${activityId}
-      `
+      `;
     } catch (dbError: any) {
       console.error("Database error updating activity:", dbError);
       console.error("Database error code:", dbError.code);
@@ -404,7 +378,51 @@ export async function PUT(
       )
     }
     
-    // Process documentation files if any - NEW APPROACH
+    // Handle existing documentation - remove those that were deleted
+    if (documentationToDelete && documentationToDelete.length > 0) {
+      try {
+        console.log("Documentation to delete received:", documentationToDelete);
+        const currentDocsResult = await sql`
+          SELECT id, url FROM dokumentasi_activity WHERE id_activity = ${activityId}
+        `;
+        
+        const currentDocIds = currentDocsResult.map((row: any) => row.id.toString());
+        console.log("Current documentation in database:", currentDocIds);
+        
+        // Filter documentationToDelete to only include IDs that actually exist in the database
+        // documentationToDelete contains the IDs of documents to DELETE
+        const docsToDelete = documentationToDelete
+          .map((id: number | string) => id.toString())
+          .filter((id: string) => currentDocIds.includes(id));
+        
+        console.log("Filtered documentation to delete:", docsToDelete);
+        
+        // Get the URLs of documents to delete
+        const docsToDeleteRecords = currentDocsResult.filter((row: any) => docsToDelete.includes(row.id.toString()));
+        const urlsToDelete = docsToDeleteRecords.map((row: any) => row.url);
+        
+        console.log("URLs to delete from blob storage:", urlsToDelete);
+        
+        // Delete documentation from blob storage
+        if (urlsToDelete.length > 0) {
+          await del(urlsToDelete);
+        }
+        
+        // Delete documentation that was removed from database
+        for (const docId of docsToDelete) {
+          await sql`
+            DELETE FROM dokumentasi_activity WHERE id = ${docId}
+          `;
+        }
+        
+        console.log(`Successfully deleted ${docsToDelete.length} documentation records`);
+      } catch (docError: any) {
+        console.error("Error removing documentation:", docError);
+        // We don't return an error here because the activity was successfully updated
+      }
+    }
+
+    // Process new documentation files if any - ONLY CREATE NEW FILES
     if (documentationFiles && documentationFiles.length > 0) {
       try {
         console.log(`Processing ${documentationFiles.length} documentation files for activity ${activityId}`);
@@ -521,30 +539,7 @@ export async function PUT(
       }
     }
     
-    // Remove documentation that was deleted
-    if (existingDocumentation && existingDocumentation.length > 0) {
-      try {
-        const currentDocsResult = await sql`
-          SELECT id FROM dokumentasi_activity WHERE id_activity = ${activityId}
-        `;
-        
-        const currentDocIds = currentDocsResult.map((row: any) => row.id.toString());
-        const docsToKeep = existingDocumentation.filter((id: string) => currentDocIds.includes(id));
-        const docsToDelete = currentDocIds.filter((id: string) => !docsToKeep.includes(id));
-        
-        // Delete documentation that was removed
-        for (const docId of docsToDelete) {
-          await sql`
-            DELETE FROM dokumentasi_activity WHERE id = ${docId}
-          `;
-        }
-      } catch (docError: any) {
-        console.error("Error removing documentation:", docError);
-        // We don't return an error here because the activity was successfully updated
-      }
-    }
-    
-    return NextResponse.json({ id: activityId, message: "Activity updated successfully" })
+    return NextResponse.json({ id: activityId, message: "Activity updated successfully" });
   } catch (error: any) {
     console.error("Error updating activity:", error)
     console.error("Error stack:", error.stack)
@@ -610,6 +605,22 @@ export async function DELETE(
         { status: 403 }
       )
     }
+    
+    // First, get all documentation URLs for this activity to delete from blob storage
+    const docsResult = await sql`
+      SELECT url FROM dokumentasi_activity WHERE id_activity = ${activityId}
+    `;
+    
+    // Delete documentation files from blob storage
+    const urlsToDelete = docsResult.map((row: any) => row.url);
+    if (urlsToDelete.length > 0) {
+      await del(urlsToDelete);
+    }
+    
+    // Delete documentation records from database
+    await sql`
+      DELETE FROM dokumentasi_activity WHERE id_activity = ${activityId}
+    `;
     
     // Delete the activity
     await sql`

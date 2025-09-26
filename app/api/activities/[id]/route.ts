@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getSession } from "@/app/api/auth/session/route"
 import { getActivityById, getActivityByIdWithReferences } from "@/lib/activities"
 import { sql } from "@/lib/db"
-import { put } from '@vercel/blob'
+import { put, del } from '@vercel/blob'
 import { sanitizeInput, validateNumericInput, validateDateInput, validateTimeInput, validateStringInput } from "@/lib/validation"
 
 export async function GET(
@@ -535,6 +535,18 @@ export async function PUT(
     // Handle existing documentation - remove those that were deleted
     if (documentationToDelete && Array.isArray(documentationToDelete)) {
       try {
+        // First, get the URLs of documents to delete for blob storage deletion
+        const docsToDeleteResult = await sql`
+          SELECT id, url FROM dokumentasi_activity WHERE id_activity = ${activityId} AND id = ANY(${documentationToDelete})
+        `;
+        
+        const urlsToDelete = docsToDeleteResult.map((row: any) => row.url);
+        
+        // Delete documentation from blob storage
+        if (urlsToDelete.length > 0) {
+          await del(urlsToDelete);
+        }
+        
         // Delete documentation that was marked for removal
         for (const docId of documentationToDelete) {
           await sql`

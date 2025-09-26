@@ -4,7 +4,14 @@ import { sql } from "@/lib/db"
 export async function GET() {
   try {
     const drivers = await sql`
-      SELECT id, name FROM cms_users WHERE id_cms_privileges != 1 ORDER BY name
+      SELECT 
+        cu.id, 
+        cu.name,
+        d.status
+      FROM cms_users cu
+      LEFT JOIN driver d ON cu.email = d.username
+      WHERE cu.id_cms_privileges != 1 
+      ORDER BY cu.name
     `
     
     return NextResponse.json(drivers)

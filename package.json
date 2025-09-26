@@ -24,7 +24,8 @@
     "lint": "next lint",
     "sessions:clean-expired": "npx tsx scripts/clean-expired-sessions.ts",
     "start": "next start",
-    "test:base-url": "node scripts/test-base-url.js"
+    "test:base-url": "node scripts/test-base-url.js",
+    "test:timezone": "node scripts/test-gmt-plus-7-implementation.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

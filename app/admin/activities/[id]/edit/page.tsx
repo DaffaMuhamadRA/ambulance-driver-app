@@ -6,6 +6,11 @@ import { useAuth } from "@/hooks/useAuth"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import LiveSearchInput from "@/components/live-search-input"
+import FileUpload from "@/components/file-upload"
+import AlertModal from "@/components/alert-modal"
+import DocumentationGallery from "@/components/documentation-gallery"
+import { formatDisplayDate } from "@/lib/timezone"
+import { FileIcon, X, RotateCcw } from "lucide-react"
 
 // Interface definitions
 interface Kantor {
@@ -26,6 +31,7 @@ interface DetailAntar {
 interface Driver {
   id: number
   name: string
+  status?: string
 }
 
 interface Pemesan {
@@ -122,19 +128,34 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
   const [rewards, setRewards] = useState<Reward[]>([])
   const [showCreatePemesan, setShowCreatePemesan] = useState(false)
   const [showCreatePM, setShowCreatePM] = useState(false)
-  const [loadingData, setLoadingData] = useState(false)
+  const [loadingData, setLoadingData] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
-  const [activityData, setActivityData] = useState<ActivityDetail | null>(null)
+  
+  // Alert modal states
+  const [alertModalOpen, setAlertModalOpen] = useState(false)
+  const [alertModalTitle, setAlertModalTitle] = useState("")
+  const [alertModalMessage, setAlertModalMessage] = useState("")
+  const [alertModalType, setAlertModalType] = useState<"info" | "success" | "warning" | "error">("info")
 
   // State for documentation files
   const [documentationFiles, setDocumentationFiles] = useState<File[]>([])
-  const [existingDocumentation, setExistingDocumentation] = useState<Array<{id: number, url: string}>>([])
+  const [existingDocumentation, setExistingDocumentation] = useState<Array<{id: number, url: string, created_at?: string}>>([])
+  const [documentationToDelete, setDocumentationToDelete] = useState<number[]>([])
+  
+  // New state for tracking newly uploaded files that can be removed before saving
+  const [newDocumentationFiles, setNewDocumentationFiles] = useState<File[]>([])
+  
+  // New state for soft deleted documentation (hidden with undo option)
+  const [softDeletedDocumentation, setSoftDeletedDocumentation] = useState<number[]>([])
+  
+  // Keep a reference to all documentation for undo functionality
+  const [allDocumentation, setAllDocumentation] = useState<Array<{id: number, url: string, created_at?: string}>>([])
 
   // Form state
   const [formData, setFormData] = useState({
-    id_kantor: "",
-    tgl: "",
+    id_kantor: "1", // Default kantor for admin
+    tgl_berangkat: "",
     tgl_pulang: "",
     id_ambulan: "",
     id_detail: "",
@@ -148,14 +169,17 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     km_awal: "",
     km_akhir: "",
     biaya_antar: "0",
-    biaya_dibayar: "0",
+    biaya_dibayar: "",
     id_pemesan: "",
     id_penerima_manfaat: "",
-    infaq: "0",
+    infaq: "",
     id_reward: "",
     kegiatan: "pengantaran",
     rumpun_program: "kesehatan",
   })
+
+  // State to track if biaya_antar has been manually edited
+  const [biayaAntarManuallyEdited, setBiayaAntarManuallyEdited] = useState(false);
 
   // New pemesan form state
   const [newPemesan, setNewPemesan] = useState({
@@ -181,6 +205,9 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
   // State untuk menyimpan data pemesan dan PM yang dipilih
   const [selectedPemesan, setSelectedPemesan] = useState<Pemesan | null>(null)
   const [selectedPM, setSelectedPM] = useState<PenerimaManfaat | null>(null)
+  
+  // State to store activity data temporarily until reference data is loaded
+  const [activityData, setActivityData] = useState<ActivityDetail | null>(null)
 
   const activityId = parseInt(params.id)
 
@@ -193,111 +220,107 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     }
   }, [user, loading, router])
 
-  // Fetch activity data for editing
+  // Fetch all data in one go
   useEffect(() => {
-    if (user && user.role === "admin" && !isNaN(activityId)) {
-      fetchActivityData()
-    }
-  }, [user, activityId])
+    async function fetchData() {
+      if (!user || isNaN(activityId)) return;
 
-  // Fetch reference data
-  useEffect(() => {
-    if (user && user.role === "admin") {
-      fetchReferenceData()
-    }
-  }, [user])
+      try {
+        setLoadingData(true);
 
-  const fetchActivityData = async () => {
-    try {
-      setLoadingData(true)
-      const response = await fetch(`/api/admin/activities/${activityId}`)
-      
-      if (!response.ok) {
-        throw new Error("Gagal memuat data aktivitas")
+        const [
+          activityRes,
+          kantorRes,
+          ambulanRes,
+          detailRes,
+          driverRes,
+          pemesanRes,
+          pmRes,
+          asnafRes,
+          rewardRes
+        ] = await Promise.all([
+          fetch(`/api/admin/activities/${activityId}`),
+          fetch("/api/reference/kantors"),
+          fetch("/api/reference/ambulans"),
+          fetch("/api/reference/details"),
+          fetch("/api/reference/drivers"),
+          fetch("/api/reference/pemesans"),
+          fetch("/api/reference/penerima-manfaats"),
+          fetch("/api/reference/asnafs"),
+          fetch("/api/reference/rewards")
+        ]);
+
+        if (!activityRes.ok) throw new Error("Gagal memuat data aktivitas");
+        
+        const activity: ActivityDetail = await activityRes.json();
+        setActivityData(activity);
+
+        // Set reference data first
+        if (kantorRes.ok) setKantors(await kantorRes.json());
+        if (ambulanRes.ok) setAmbulans(await ambulanRes.json());
+        if (detailRes.ok) setDetails(await detailRes.json());
+        if (driverRes.ok) setDrivers(await driverRes.json());
+        if (pemesanRes.ok) {
+          const pemesansData = await pemesanRes.json();
+          setPemesans(pemesansData);
+        }
+        if (pmRes.ok) {
+          const pmsData = await pmRes.json();
+          setPenerimaManfaats(pmsData);
+        }
+        if (asnafRes.ok) setAsnafs(await asnafRes.json());
+        if (rewardRes.ok) setRewards(await rewardRes.json());
+
+        // Now set form data with activity values after reference data is loaded
+        setFormData({
+            id_kantor: activity.id_kantor?.toString() || "1",
+            tgl_berangkat: activity.tgl_berangkat || "",
+            tgl_pulang: activity.tgl_pulang || "",
+            id_ambulan: activity.id_ambulan?.toString() || "",
+            id_detail: activity.id_detail?.toString() || "",
+            jam_berangkat: activity.jam_berangkat || "",
+            jam_pulang: activity.jam_pulang || "",
+            id_driver: activity.id_driver?.toString() || "",
+            asisten_luar_kota: activity.asisten_luar_kota || "",
+            area: activity.area || "Dalam Kota",
+            dari: activity.dari || "",
+            tujuan: activity.tujuan || "",
+            km_awal: activity.km_awal?.toString() || "",
+            km_akhir: activity.km_akhir?.toString() || "",
+            biaya_antar: activity.biaya_antar?.toString() || "0",
+            biaya_dibayar: activity.biaya_dibayar !== null ? activity.biaya_dibayar.toString() : "",
+            id_pemesan: activity.id_pemesan?.toString() || "",
+            id_penerima_manfaat: activity.id_penerima_manfaat?.toString() || "",
+            infaq: activity.infaq !== null ? activity.infaq.toString() : "",
+            id_reward: activity.id_reward?.toString() || "",
+            kegiatan: activity.kegiatan || "pengantaran",
+            rumpun_program: activity.rumpun_program || "kesehatan",
+        });
+
+        // Reset biaya antar manual edit state when loading data
+        setBiayaAntarManuallyEdited(false);
+
+        // Set existing documentation
+        if (activity.documentation) {
+          const docs = activity.documentation.map((doc: any) => ({
+            id: doc.id,
+            url: doc.url,
+            created_at: doc.created_at
+          }));
+          setExistingDocumentation(docs);
+          setAllDocumentation(docs); // Keep a reference to all documentation
+        }
+
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat data");
+        console.error(err);
+      } finally {
+        setLoadingData(false);
       }
-      
-      const activity: ActivityDetail = await response.json()
-      setActivityData(activity);
-      
-      // Set form data with activity values
-      setFormData({
-        id_kantor: activity.id_kantor?.toString() || "",
-        tgl: activity.tgl_berangkat || "",
-        tgl_pulang: activity.tgl_pulang || "",
-        id_ambulan: activity.id_ambulan?.toString() || "",
-        id_detail: activity.id_detail?.toString() || "",
-        jam_berangkat: activity.jam_berangkat || "",
-        jam_pulang: activity.jam_pulang || "",
-        id_driver: activity.id_driver?.toString() || "",
-        asisten_luar_kota: activity.asisten_luar_kota || "",
-        area: activity.area || "Dalam Kota",
-        dari: activity.dari || "",
-        tujuan: activity.tujuan || "",
-        km_awal: activity.km_awal?.toString() || "",
-        km_akhir: activity.km_akhir?.toString() || "",
-        biaya_antar: activity.biaya_antar?.toString() || "0",
-        biaya_dibayar: activity.biaya_dibayar?.toString() || "0",
-        id_pemesan: activity.id_pemesan?.toString() || "",
-        id_penerima_manfaat: activity.id_penerima_manfaat?.toString() || "",
-        infaq: activity.infaq?.toString() || "0",
-        id_reward: activity.id_reward?.toString() || "",
-        kegiatan: activity.kegiatan || "pengantaran",
-        rumpun_program: activity.rumpun_program || "kesehatan",
-      })
-      
-      // Set existing documentation
-      if (activity.documentation) {
-        setExistingDocumentation(activity.documentation)
-      }
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memuat data aktivitas")
-      console.error(err)
-    } finally {
-      setLoadingData(false)
     }
-  }
 
-  const fetchReferenceData = async () => {
-    try {
-      setLoadingData(true)
-      
-      const [
-        kantorRes,
-        ambulanRes,
-        detailRes,
-        driverRes,
-        pemesanRes,
-        pmRes,
-        asnafRes,
-        rewardRes
-      ] = await Promise.all([
-        fetch("/api/reference/kantors"),
-        fetch("/api/reference/ambulans"),
-        fetch("/api/reference/details"),
-        fetch("/api/reference/drivers"),
-        fetch("/api/reference/pemesans"),
-        fetch("/api/reference/penerima-manfaats"),
-        fetch("/api/reference/asnafs"),
-        fetch("/api/reference/rewards")
-      ])
-
-      if (kantorRes.ok) setKantors(await kantorRes.json())
-      if (ambulanRes.ok) setAmbulans(await ambulanRes.json())
-      if (detailRes.ok) setDetails(await detailRes.json())
-      if (driverRes.ok) setDrivers(await driverRes.json())
-      if (pemesanRes.ok) setPemesans(await pemesanRes.json())
-      if (pmRes.ok) setPenerimaManfaats(await pmRes.json())
-      if (asnafRes.ok) setAsnafs(await asnafRes.json())
-      if (rewardRes.ok) setRewards(await rewardRes.json())
-      
-      setLoadingData(false)
-    } catch (err) {
-      setError("Gagal memuat data referensi")
-      setLoadingData(false)
-      console.error(err)
-    }
-  }
+    fetchData();
+  }, [user, activityId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -306,6 +329,17 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       [name]: value
     }))
     
+    // Track if biaya_antar is manually edited
+    if (name === "biaya_antar") {
+      setBiayaAntarManuallyEdited(true);
+    }
+    
+    // Reset biaya antar manual edit state when km values change
+    if (name === "km_awal" || name === "km_akhir") {
+      setBiayaAntarManuallyEdited(false);
+    }
+    
+    // Clear validation error for this field
     if (validationErrors[name]) {
       setValidationErrors(prev => {
         const newErrors = { ...prev }
@@ -314,64 +348,44 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       })
     }
     
+    // Clear general error message
     if (error) {
       setError(null)
     }
   }
 
-  useEffect(() => {
-    const kmAwal = parseInt(formData.km_awal) || 0
-    const kmAkhir = parseInt(formData.km_akhir) || 0
+  // Function to filter rewards based on driver status only
+  const getFilteredRewards = () => {
+    // If no driver selected, show all rewards
+    if (!formData.id_driver) {
+      return rewards;
+    }
     
-    if (kmAwal >= 0 && kmAkhir >= 0 && kmAkhir >= kmAwal) {
-      const biaya = (kmAkhir - kmAwal) * 6000
-      if (formData.biaya_antar !== biaya.toString()) {
-        setFormData(prev => ({
-          ...prev,
-          biaya_antar: biaya.toString()
-        }))
-      }
+    // Find the selected driver
+    const selectedDriver = drivers.find(driver => driver.id === parseInt(formData.id_driver));
+    
+    // If driver not found or no status, show all rewards
+    if (!selectedDriver || !selectedDriver.status) {
+      return rewards;
     }
-  }, [formData.km_awal, formData.km_akhir])
+    
+    // Filter rewards based on driver status only
+    return rewards.filter(reward => reward.jenis === selectedDriver.status);
+  };
 
-  const handlePemesanSelect = (pemesan: Pemesan | null) => {
-    if (pemesan) {
-      setFormData(prev => ({
-        ...prev,
-        id_pemesan: pemesan.id.toString()
-      }))
-      setSelectedPemesan(pemesan)
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        id_pemesan: ""
-      }))
-      setSelectedPemesan(null)
-    }
-  }
-
-  const handlePMSelect = (pm: PenerimaManfaat | null) => {
-    if (pm) {
-      setFormData(prev => ({
-        ...prev,
-        id_penerima_manfaat: pm.id.toString()
-      }))
-      setSelectedPM(pm)
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        id_penerima_manfaat: ""
-      }))
-      setSelectedPM(null)
-    }
-  }
-
-  const handleRewardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDriverChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value
-    const reward = rewards.find(r => `${r.jenis} - ${r.tipe}` === value)
     setFormData(prev => ({
       ...prev,
-      id_reward: reward ? reward.id.toString() : ""
+      id_driver: value
+    }))
+  }
+
+  const handleRewardChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value
+    setFormData(prev => ({
+      ...prev,
+      id_reward: value
     }))
   }
 
@@ -388,13 +402,16 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
 
       if (response.ok) {
         const createdPemesan = await response.json()
+        // Add to pemesans list
         setPemesans(prev => [...prev, createdPemesan])
+        // Set as selected
         setFormData(prev => ({
           ...prev,
           id_pemesan: createdPemesan.id.toString()
         }))
-        handlePemesanSelect(createdPemesan)
+        // Close the create form
         setShowCreatePemesan(false)
+        // Reset form
         setNewPemesan({
           nama_pemesan: "",
           hp: ""
@@ -409,6 +426,230 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     }
   }
 
+  const handleDocumentationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files)
+      setNewDocumentationFiles(prev => [...prev, ...files])
+    }
+  }
+  
+  const removeNewDocumentationFile = (index: number) => {
+    setNewDocumentationFiles(prev => prev.filter((_, i) => i !== index))
+  }
+  
+  const removeExistingDocumentation = (id: number) => {
+    // Add to soft deletion list instead of immediate deletion
+    setSoftDeletedDocumentation(prev => [...prev, id])
+    
+    // Remove from existing documentation display
+    setExistingDocumentation(prev => prev.filter(doc => doc.id !== id))
+  }
+  
+  // New function to undo soft deletion
+  const undoDeleteDocumentation = (id: number) => {
+    // Remove from soft deletion list
+    setSoftDeletedDocumentation(prev => prev.filter(docId => docId !== id))
+    
+    // Find the document in allDocumentation and add it back to existingDocumentation
+    const docToAddBack = allDocumentation.find(doc => doc.id === id);
+    if (docToAddBack) {
+      setExistingDocumentation(prev => [...prev, docToAddBack])
+    }
+  }
+  
+  const removeSelectedDocumentation = (ids: number[]) => {
+    // Add all selected documents to soft deletion list
+    setSoftDeletedDocumentation(prev => [...prev, ...ids])
+    
+    // Remove from existing documentation display
+    setExistingDocumentation(prev => prev.filter(doc => !ids.includes(doc.id)))
+  }
+
+  const handlePemesanSelect = (pemesan: Pemesan | null) => {
+    if (pemesan) {
+      setFormData(prev => ({
+        ...prev,
+        id_pemesan: pemesan.id.toString()
+      }))
+      setSelectedPemesan(pemesan)
+    } else {
+      // Clear the selection
+      setFormData(prev => ({
+        ...prev,
+        id_pemesan: ""
+      }))
+      setSelectedPemesan(null)
+    }
+  }
+
+  const handlePMSelect = (pm: PenerimaManfaat | null) => {
+    if (pm) {
+      setFormData(prev => ({
+        ...prev,
+        id_penerima_manfaat: pm.id.toString()
+      }))
+      setSelectedPM(pm)
+    } else {
+      // Clear the selection
+      setFormData(prev => ({
+        ...prev,
+        id_penerima_manfaat: ""
+      }))
+      setSelectedPM(null)
+    }
+  }
+  
+  // Update the useEffect that sets existingDocumentation to also set allDocumentation
+  useEffect(() => {
+    if (pemesans.length > 0 && penerimaManfaats.length > 0 && drivers.length > 0 && activityData && !selectedPemesan && !selectedPM) {
+      // Get activity data from form state
+      const activityIdPemesan = activityData.id_pemesan;
+      const activityIdPM = activityData.id_penerima_manfaat;
+      const activityIdDriver = activityData.id_driver;
+      
+      // Set selected pemesan if it exists
+      if (activityIdPemesan && activityIdPemesan > 0) {
+        const pemesan = pemesans.find(p => p.id === activityIdPemesan);
+        if (pemesan && (!selectedPemesan || (selectedPemesan as Pemesan)?.id !== pemesan.id)) {
+          setSelectedPemesan(pemesan);
+        }
+      }
+      
+      // Set selected PM if it exists
+      if (activityIdPM && activityIdPM > 0) {
+        const pm = penerimaManfaats.find(p => p.id === activityIdPM);
+        if (pm && (!selectedPM || (selectedPM as PenerimaManfaat)?.id !== pm.id)) {
+          setSelectedPM(pm);
+        }
+      }
+      
+      // Set selected driver if it exists
+      if (activityIdDriver && activityIdDriver > 0) {
+        const driver = drivers.find(d => d.id === activityIdDriver);
+        if (driver) {
+          setFormData(prev => ({
+            ...prev,
+            id_driver: activityIdDriver.toString()
+          }));
+        }
+      }
+      
+      // Set existing documentation
+      if (activityData.documentation) {
+        const docs = activityData.documentation.map((doc: any) => ({
+          id: doc.id,
+          url: doc.url,
+          created_at: doc.created_at
+        }));
+        setExistingDocumentation(docs);
+        setAllDocumentation(docs); // Keep a reference to all documentation
+      }
+    }
+  }, [pemesans.length, penerimaManfaats.length, drivers.length, activityData?.id]);
+
+  // Additional useEffect to handle cases where reference data loads after activity data
+  useEffect(() => {
+    if (activityData && ((pemesans.length > 0 && penerimaManfaats.length > 0) || drivers.length > 0) && (!selectedPemesan || !selectedPM || !formData.id_driver)) {
+      // Update pemesan if needed
+      if (activityData.id_pemesan && activityData.id_pemesan > 0 && pemesans.length > 0 && !selectedPemesan) {
+        const pemesan = pemesans.find(p => p.id === activityData.id_pemesan);
+        if (pemesan && (!selectedPemesan || (selectedPemesan as Pemesan)?.id !== pemesan.id)) {
+          setSelectedPemesan(pemesan);
+        }
+      }
+      
+      // Update PM if needed
+      if (activityData.id_penerima_manfaat && activityData.id_penerima_manfaat > 0 && penerimaManfaats.length > 0 && !selectedPM) {
+        const pm = penerimaManfaats.find(p => p.id === activityData.id_penerima_manfaat);
+        if (pm && (!selectedPM || (selectedPM as PenerimaManfaat)?.id !== pm.id)) {
+          setSelectedPM(pm);
+        }
+      }
+      
+      // Update driver if needed
+      if (activityData.id_driver && activityData.id_driver > 0 && drivers.length > 0 && !formData.id_driver) {
+        const driver = drivers.find(d => d.id === activityData.id_driver);
+        if (driver) {
+          setFormData(prev => ({
+            ...prev,
+            id_driver: activityData.id_driver.toString()
+          }));
+        }
+      }
+      
+      // Set existing documentation if not already set
+      if (activityData.documentation && existingDocumentation.length === 0) {
+        const docs = activityData.documentation.map((doc: any) => ({
+          id: doc.id,
+          url: doc.url,
+          created_at: doc.created_at
+        }));
+        setExistingDocumentation(docs);
+        setAllDocumentation(docs); // Keep a reference to all documentation
+      }
+    }
+  }, [pemesans.length, penerimaManfaats.length, drivers.length, activityData?.id, formData.id_driver]);
+
+  // Update form data when drivers are loaded if we have activity data but no driver is selected in form
+  useEffect(() => {
+    if (activityData && drivers.length > 0 && !formData.id_driver && activityData.id_driver) {
+      const driver = drivers.find(d => d.id === activityData.id_driver);
+      if (driver) {
+        setFormData(prev => ({
+          ...prev,
+          id_driver: activityData.id_driver.toString()
+        }));
+      }
+    }
+  }, [drivers.length, activityData?.id_driver, formData.id_driver]);
+  
+  // Automatically determine reward type based on driver status only
+  useEffect(() => {
+    // Only auto-select reward if we have a driver selected
+    if (!formData.id_driver) return;
+    
+    // Find the selected driver
+    const selectedDriver = drivers.find(driver => driver.id === parseInt(formData.id_driver));
+    
+    // If driver not found or no status, return
+    if (!selectedDriver || !selectedDriver.status) return;
+    
+    // If there's already a selected reward that matches the driver's status, don't change it
+    if (formData.id_reward) {
+      const currentReward = rewards.find(r => r.id === parseInt(formData.id_reward));
+      if (currentReward && currentReward.jenis === selectedDriver.status) {
+        return; // Keep the current selection
+      }
+    }
+    
+    // Find the first reward that matches the driver's status
+    const matchingReward = rewards.find(r => r.jenis === selectedDriver.status);
+    
+    if (matchingReward) {
+      setFormData(prev => ({
+        ...prev,
+        id_reward: matchingReward.id.toString()
+      }));
+    }
+  }, [formData.id_driver, rewards, drivers, formData.id_reward]);
+
+  // Automatically calculate biaya_antar based on (km_akhir - km_awal) * 6000
+  useEffect(() => {
+    // Only auto-calculate if biaya_antar hasn't been manually edited
+    if (!biayaAntarManuallyEdited) {
+      const kmAwal = parseFloat(formData.km_awal as string) || 0;
+      const kmAkhir = parseFloat(formData.km_akhir as string) || 0;
+      
+      if (kmAwal >= 0 && kmAkhir >= 0 && kmAkhir >= kmAwal) {
+        const calculatedBiaya = (kmAkhir - kmAwal) * 6000;
+        setFormData(prev => ({
+          ...prev,
+          biaya_antar: calculatedBiaya.toString()
+        }));
+      }
+    }
+  }, [formData.km_awal, formData.km_akhir, biayaAntarManuallyEdited]);
+
   const handleCreatePM = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -419,6 +660,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         },
         body: JSON.stringify({
           ...newPM,
+          // Convert numeric fields
           usia_pm: newPM.usia_pm ? parseInt(newPM.usia_pm) : null,
           id_asnaf: newPM.id_asnaf ? parseInt(newPM.id_asnaf) : null
         })
@@ -426,13 +668,16 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
 
       if (response.ok) {
         const createdPM = await response.json()
+        // Add to penerima manfaats list
         setPenerimaManfaats(prev => [...prev, createdPM])
+        // Set as selected
         setFormData(prev => ({
           ...prev,
           id_penerima_manfaat: createdPM.id.toString()
         }))
-        handlePMSelect(createdPM)
+        // Close the create form
         setShowCreatePM(false)
+        // Reset form
         setNewPM({
           nama_pm: "",
           alamat_pm: "",
@@ -456,97 +701,34 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     }
   }
 
-  useEffect(() => {
-    if (pemesans.length > 0 && penerimaManfaats.length > 0 && activityData) {
-      const activityIdPemesan = activityData.id_pemesan;
-      const activityIdPM = activityData.id_penerima_manfaat;
-      
-      if (activityIdPemesan && activityIdPemesan > 0) {
-        const pemesan = pemesans.find(p => p.id === activityIdPemesan);
-        if (pemesan) {
-          setSelectedPemesan(pemesan);
-          setFormData(prev => ({
-            ...prev,
-            id_pemesan: pemesan.id.toString()
-          }));
-        }
-      } else {
-        setSelectedPemesan(null);
-      }
-      
-      if (activityIdPM && activityIdPM > 0) {
-        const pm = penerimaManfaats.find(p => p.id === activityIdPM);
-        if (pm) {
-          setSelectedPM(pm);
-          setFormData(prev => ({
-            ...prev,
-            id_penerima_manfaat: pm.id.toString()
-          }));
-        }
-      } else {
-        setSelectedPM(null);
-      }
-    }
-  }, [pemesans, penerimaManfaats, activityData])
+  const handleDocumentationDelete = (id: number) => {
+    setDocumentationToDelete(prev => [...prev, id]);
+  }
 
-  useEffect(() => {
-    if (activityData && (pemesans.length > 0 || penerimaManfaats.length > 0)) {
-      if (activityData.id_pemesan && activityData.id_pemesan > 0 && pemesans.length > 0) {
-        const pemesan = pemesans.find(p => p.id === activityData.id_pemesan);
-        if (pemesan && !selectedPemesan) {
-          setSelectedPemesan(pemesan);
-          setFormData(prev => ({
-            ...prev,
-            id_pemesan: pemesan.id.toString()
-          }));
-        }
-      }
-      
-      if (activityData.id_penerima_manfaat && activityData.id_penerima_manfaat > 0 && penerimaManfaats.length > 0) {
-        const pm = penerimaManfaats.find(p => p.id === activityData.id_penerima_manfaat);
-        if (pm && !selectedPM) {
-          setSelectedPM(pm);
-          setFormData(prev => ({
-            ...prev,
-            id_penerima_manfaat: pm.id.toString()
-          }));
-        }
-      }
-    }
-  }, [pemesans, penerimaManfaats, activityData, selectedPemesan, selectedPM])
-
-  const handleDocumentationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files)
-      setDocumentationFiles(prev => [...prev, ...files])
-    }
-  }
-  
-  const removeDocumentationFile = (index: number) => {
-    setDocumentationFiles(prev => prev.filter((_, i) => i !== index))
-  }
-  
-  const removeExistingDocumentation = (id: number) => {
-    setExistingDocumentation(prev => prev.filter(doc => doc.id !== id))
-  }
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validate required fields
     const errors: Record<string, boolean> = {}
     
-    if (!formData.tgl) errors.tgl = true
+    // Always required fields
+    if (!formData.tgl_berangkat) errors.tgl_berangkat = true
+    if (!formData.tgl_pulang) errors.tgl_pulang = true
     if (!formData.id_ambulan) errors.id_ambulan = true
     if (!formData.id_detail) errors.id_detail = true
     if (!formData.jam_berangkat) errors.jam_berangkat = true
     if (!formData.jam_pulang) errors.jam_pulang = true
     if (!formData.dari) errors.dari = true
     if (!formData.tujuan) errors.tujuan = true
-    if (!formData.id_driver) errors.id_driver = true
-    if (!formData.id_kantor) errors.id_kantor = true
+    // Removed validation for id_driver - not required for admin users
     
+    // Removed validation for km_awal, km_akhir, biaya_antar, id_pemesan, and id_penerima_manfaat
+    // These fields are now optional as requested
+    
+    // Update validation errors state
     setValidationErrors(errors)
     
+    // If there are validation errors, don't submit
     if (Object.keys(errors).length > 0) {
       setError("Harap lengkapi semua field yang wajib diisi")
       return
@@ -555,43 +737,38 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
     try {
       setLoadingData(true)
       
-      const dataToSend = {
-        ...formData,
-        id: activityId,
-        id_driver: formData.id_driver ? parseInt(formData.id_driver) : null,
-        km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
-        km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
-        biaya_antar: formData.biaya_antar ? parseInt(formData.biaya_antar) : 0,
-        biaya_dibayar: formData.biaya_dibayar ? parseInt(formData.biaya_dibayar) : 0,
-        infaq: formData.infaq !== "" ? parseInt(formData.infaq) : null,
-        id_reward: formData.id_reward ? parseInt(formData.id_reward) : null,
-        id_kantor: formData.id_kantor ? parseInt(formData.id_kantor) : null,
-        id_ambulan: formData.id_ambulan ? parseInt(formData.id_ambulan) : null,
-        id_detail: formData.id_detail ? parseInt(formData.id_detail) : null,
-        id_pemesan: formData.id_pemesan ? parseInt(formData.id_pemesan) : null,
-        id_penerima_manfaat: formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null
-      }
+      // Prepare form data
+      const submitData = new FormData()
       
-      const formDataObj = new FormData()
-      formDataObj.append("data", JSON.stringify(dataToSend))
-      
-      documentationFiles.forEach(file => {
-        formDataObj.append("documentation", file)
+      // Add all form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        submitData.append(key, value as string)
       })
       
-      existingDocumentation.forEach(doc => {
-        formDataObj.append("existingDocumentation", doc.id.toString())
+      // Add documentation to delete (soft deleted documentation)
+      if (softDeletedDocumentation.length > 0) {
+        submitData.append('documentationToDelete', JSON.stringify(softDeletedDocumentation))
+      }
+      
+      // Add new documentation files
+      newDocumentationFiles.forEach((file) => {
+        submitData.append('documentation', file)
       })
       
       const response = await fetch(`/api/admin/activities/${activityId}`, {
         method: "PUT",
-        body: formDataObj
+        body: submitData
       })
 
       if (response.ok) {
-        router.push('/dashboard')
+        // Show alert modal instead of direct redirect
+        setAlertModalTitle("Berhasil")
+        setAlertModalMessage("Aktivitas berhasil diperbarui!")
+        setAlertModalType("success")
+        setAlertModalOpen(true)
       } else {
         const errorData = await response.json()
+        // Create a more detailed error message
         let errorMessage = errorData.error || "Gagal memperbarui aktivitas"
         if (errorData.details) {
           errorMessage += `: ${errorData.details}`
@@ -600,7 +777,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memperbarui aktivitas")
-      console.error("Form Submission Error:", err)
+      console.error(err)
     } finally {
       setLoadingData(false)
     }
@@ -665,6 +842,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
         
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {/* Kantor - Show for admin users */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Kantor</label>
               <select
@@ -686,21 +864,39 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
+            {/* Tanggal Berangkat */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Tanggal</label>
+              <label className="block text-sm font-medium text-gray-700">Tanggal Berangkat</label>
               <input
                 type="date"
-                name="tgl"
-                value={formData.tgl}
+                name="tgl_berangkat"
+                value={formData.tgl_berangkat}
                 onChange={handleInputChange}
-                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tgl ? 'border-red-500' : 'border-gray-300'}`}
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tgl_berangkat ? 'border-red-500' : 'border-gray-300'}`}
                 required
               />
-              {validationErrors.tgl && (
-                <p className="mt-1 text-sm text-red-600">Tanggal wajib diisi</p>
+              {validationErrors.tgl_berangkat && (
+                <p className="mt-1 text-sm text-red-600">Tanggal berangkat wajib diisi</p>
               )}
             </div>
             
+            {/* Tanggal Pulang */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Tanggal Pulang</label>
+              <input
+                type="date"
+                name="tgl_pulang"
+                value={formData.tgl_pulang}
+                onChange={handleInputChange}
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tgl_pulang ? 'border-red-500' : 'border-gray-300'}`}
+                required
+              />
+              {validationErrors.tgl_pulang && (
+                <p className="mt-1 text-sm text-red-600">Tanggal pulang wajib diisi</p>
+              )}
+            </div>
+            
+            {/* Ambulan */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Ambulan</label>
               <select
@@ -722,6 +918,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
+            {/* Detail */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Detail</label>
               <select
@@ -743,6 +940,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
+            {/* Jam Berangkat */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Jam Berangkat</label>
               <input
@@ -758,6 +956,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
+            {/* Jam Pulang */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Jam Pulang</label>
               <input
@@ -773,59 +972,53 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               )}
             </div>
             
+            {/* Driver - Show for admin users */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Driver</label>
               <select
                 name="id_driver"
                 value={formData.id_driver}
-                onChange={handleInputChange}
+                onChange={handleDriverChange}
                 className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.id_driver ? 'border-red-500' : 'border-gray-300'}`}
-                required
               >
-                <option value="">Pilih Driver</option>
+                <option value="">Pilih Driver (Opsional)</option>
                 {drivers.map(driver => (
                   <option key={driver.id} value={driver.id}>
-                    {driver.name}
+                    {driver.name} {driver.status && `(${driver.status})`}
                   </option>
                 ))}
               </select>
-              {validationErrors.id_driver && (
-                <p className="mt-1 text-sm text-red-600">Driver wajib dipilih</p>
-              )}
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Jenis</label>
-              <input
-                type="text"
-                name="jenis"
-                value={rewards.find(r => r.id === parseInt(formData.id_reward || "0")) ? 
-                       `${rewards.find(r => r.id === parseInt(formData.id_reward || "0"))?.jenis} - ${rewards.find(r => r.id === parseInt(formData.id_reward || "0"))?.tipe}` : ""}
-                onChange={handleRewardChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                list="reward-options"
-                placeholder="Pilih atau ketik jenis reward"
-              />
-              <datalist id="reward-options">
-                {rewards.map(reward => (
-                  <option key={reward.id} value={`${reward.jenis} - ${reward.tipe}`} />
-                ))}
-              </datalist>
+            {/* Detail Driver (Read-only) - Always shown */}
+            <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Driver Saat Ini</label>
+                <input
+                  type="text"
+                  value={activityData?.id_driver && drivers.length > 0 
+                    ? drivers.find(driver => driver.id === activityData.id_driver)?.name || "Tidak ada data"
+                    : "Belum ada driver yang dipilih"
+                  }
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Status Driver</label>
+                <input
+                  type="text"
+                  value={activityData?.id_driver && drivers.length > 0 
+                    ? drivers.find(driver => driver.id === activityData.id_driver)?.status || "Tidak ada data"
+                    : "Belum ada driver yang dipilih"
+                  }
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Reward (Rp)</label>
-              <input
-                type="text"
-                name="reward_value"
-                value={rewards.find(r => r.id === parseInt(formData.id_reward || "0"))?.reward ? 
-                       `Rp ${rewards.find(r => r.id === parseInt(formData.id_reward || "0"))?.reward?.toLocaleString("id-ID")}` : ""}
-                readOnly
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
-                placeholder="Pilih jenis reward terlebih dahulu"
-              />
-            </div>
-            
+            {/* Asisten Luar Kota */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Asisten Luar Kota</label>
               <input
@@ -833,49 +1026,62 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 name="asisten_luar_kota"
                 value={formData.asisten_luar_kota}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.asisten_luar_kota ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {/* Removed required validation for asisten_luar_kota - now optional */}
             </div>
             
+            {/* Area */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Area</label>
-              <input
-                type="text"
+              <select
                 name="area"
                 value={formData.area}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-              />
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.area ? 'border-red-500' : 'border-gray-300'}`}
+                required
+              >
+                <option value="Dalam Kota">Dalam Kota</option>
+                <option value="Luar Kota">Luar Kota</option>
+              </select>
+              {validationErrors.area && (
+                <p className="mt-1 text-sm text-red-600">Area wajib dipilih</p>
+              )}
             </div>
             
-            <div className="sm:col-span-2">
+            {/* Dari */}
+            <div>
               <label className="block text-sm font-medium text-gray-700">Dari</label>
-              <textarea
+              <input
+                type="text"
                 name="dari"
                 value={formData.dari}
                 onChange={handleInputChange}
-                rows={2}
                 className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.dari ? 'border-red-500' : 'border-gray-300'}`}
+                required
               />
               {validationErrors.dari && (
-                <p className="mt-1 text-sm text-red-600">Field 'Dari' wajib diisi</p>
+                <p className="mt-1 text-sm text-red-600">Dari wajib diisi</p>
               )}
             </div>
             
-            <div className="sm:col-span-2">
+            {/* Tujuan */}
+            <div>
               <label className="block text-sm font-medium text-gray-700">Tujuan</label>
-              <textarea
+              <input
+                type="text"
                 name="tujuan"
                 value={formData.tujuan}
                 onChange={handleInputChange}
-                rows={2}
                 className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tujuan ? 'border-red-500' : 'border-gray-300'}`}
+                required
               />
               {validationErrors.tujuan && (
-                <p className="mt-1 text-sm text-red-600">Field 'Tujuan' wajib diisi</p>
+                <p className="mt-1 text-sm text-red-600">Tujuan wajib diisi</p>
               )}
             </div>
             
+            {/* KM Awal */}
             <div>
               <label className="block text-sm font-medium text-gray-700">KM Awal</label>
               <input
@@ -883,10 +1089,12 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 name="km_awal"
                 value={formData.km_awal}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.km_awal ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {/* Removed required validation for km_awal - now optional */}
             </div>
             
+            {/* KM Akhir */}
             <div>
               <label className="block text-sm font-medium text-gray-700">KM Akhir</label>
               <input
@@ -894,34 +1102,107 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 name="km_akhir"
                 value={formData.km_akhir}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.km_akhir ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {/* Removed required validation for km_akhir - now optional */}
             </div>
             
+            {/* Biaya Antar - Editable for all users */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Biaya Antar</label>
+              <label className="block text-sm font-medium text-gray-700">Biaya Antar (Auto-calculated)</label>
+              <div className="flex space-x-2">
+                <input
+                  type="number"
+                  name="biaya_antar"
+                  value={formData.biaya_antar}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const kmAwal = parseFloat(formData.km_awal as string) || 0;
+                    const kmAkhir = parseFloat(formData.km_akhir as string) || 0;
+                    
+                    if (kmAwal >= 0 && kmAkhir >= 0 && kmAkhir >= kmAwal) {
+                      const calculatedBiaya = (kmAkhir - kmAwal) * 6000;
+                      setFormData(prev => ({
+                        ...prev,
+                        biaya_antar: calculatedBiaya.toString()
+                      }));
+                      setBiayaAntarManuallyEdited(false);
+                    }
+                  }}
+                  className="px-3 py-2 mt-1 text-sm bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none"
+                >
+                  Reset
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">Calculated as: (KM Akhir - KM Awal) × 6000</p>
+            </div>
+            
+            {/* Jenis Pengantaran - Show filtered reward types based on driver status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Jenis Pengantaran</label>
+              <select
+                name="id_reward"
+                value={formData.id_reward}
+                onChange={handleRewardChange}
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+              >
+                <option value="">Pilih Jenis Pengantaran</option>
+                {getFilteredRewards().map((reward) => (
+                  <option key={reward.id} value={reward.id}>
+                    {reward.jenis} - {reward.tipe}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Read-only display of current reward information */}
+            {formData.id_reward && rewards.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Jenis Pengantaran Saat Ini</label>
+                <input
+                  type="text"
+                  value={`${rewards.find(r => r.id === parseInt(formData.id_reward))?.jenis || ""} - ${rewards.find(r => r.id === parseInt(formData.id_reward))?.tipe || ""}`}
+                  readOnly
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
+                />
+              </div>
+            )}
+            
+            {/* Reward - Read-only field showing the reward value */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Reward</label>
               <input
-                type="number"
-                name="biaya_antar"
-                value={formData.biaya_antar}
-                onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                type="text"
+                value={
+                  formData.id_reward 
+                    ? rewards.find(r => r.id === parseInt(formData.id_reward))?.reward?.toLocaleString('id-ID') || ""
+                    : ""
+                }
+                readOnly
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
               />
             </div>
             
+            {/* Biaya Dibayar */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Biaya yang Dibayar</label>
+              <label className="block text-sm font-medium text-gray-700">Biaya Dibayar</label>
               <input
                 type="number"
                 name="biaya_dibayar"
                 value={formData.biaya_dibayar}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.biaya_dibayar ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {/* Removed required validation for biaya_dibayar - now optional */}
             </div>
             
+            {/* Pemesan */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
+              <label className="block text-sm font-medium text-gray-700">Pemesan</label>
               <LiveSearchInput
                 items={pemesans}
                 onSelect={handlePemesanSelect}
@@ -929,30 +1210,27 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 placeholder="Cari atau ketik nama pemesan/no HP"
                 displayKey="nama_pemesan"
                 searchKeys={["nama_pemesan", "hp"]}
-                initialValue={activityData?.nama_pemesan || ""}
-                initialItemId={activityData?.id_pemesan || undefined}
                 onCreate={() => setShowCreatePemesan(true)}
-                name="id_pemesan"
-                allowClear={true}
               />
             </div>
-            
-            {(selectedPemesan || (activityData?.id_pemesan && activityData?.id_pemesan > 0)) && (
+
+            {/* Detail Pemesan (Read-only) */}
+            {selectedPemesan && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
+                  <label className="block text-sm font-medium text-gray-700">Detail Nama Pemesan</label>
                   <input
                     type="text"
-                    value={selectedPemesan?.nama_pemesan || activityData?.nama_pemesan || "Tidak ada data"}
+                    value={selectedPemesan.nama_pemesan || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">No HP</label>
+                  <label className="block text-sm font-medium text-gray-700">Detail No HP Pemesan</label>
                   <input
                     type="text"
-                    value={selectedPemesan?.hp || activityData?.hp || "Tidak ada data"}
+                    value={selectedPemesan.hp || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -960,29 +1238,28 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               </div>
             )}
             
+            {/* Penerima Manfaat */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Nama PM</label>
+              <label className="block text-sm font-medium text-gray-700">Penerima Manfaat</label>
               <LiveSearchInput
                 items={penerimaManfaats}
                 onSelect={handlePMSelect}
+                onAutoFill={handlePMSelect}
                 placeholder="Cari atau ketik nama PM"
                 displayKey="nama_pm"
                 searchKeys={["nama_pm"]}
-                initialValue={activityData?.nama_pm || ""}
-                initialItemId={activityData?.id_penerima_manfaat || undefined}
                 onCreate={() => setShowCreatePM(true)}
-                name="id_penerima_manfaat"
-                allowClear={true}
               />
             </div>
-            
-            {(selectedPM || (activityData?.id_penerima_manfaat && activityData?.id_penerima_manfaat > 0)) && (
+
+            {/* Detail PM (Read-only) */}
+            {selectedPM && (
               <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Nama PM</label>
                   <input
                     type="text"
-                    value={selectedPM?.nama_pm || activityData?.nama_pm || "Tidak ada data"}
+                    value={selectedPM.nama_pm || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -991,7 +1268,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Alamat PM</label>
                   <input
                     type="text"
-                    value={selectedPM?.alamat_pm || activityData?.alamat_pm || "Tidak ada data"}
+                    value={selectedPM.alamat_pm || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1000,7 +1277,11 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Jenis Kelamin</label>
                   <input
                     type="text"
-                    value={selectedPM?.jenis_kelamin_pm || activityData?.jenis_kelamin_pm || "Tidak ada data"}
+                    value={
+                      selectedPM?.jenis_kelamin_pm === 'l' ? 'Laki Laki' :
+                      selectedPM?.jenis_kelamin_pm === 'p' ? 'Perempuan' :
+                      selectedPM?.jenis_kelamin_pm || "Tidak ada data"
+                    }
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1010,10 +1291,8 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <input
                     type="text"
                     value={
-                      selectedPM?.usia_pm !== undefined && selectedPM?.usia_pm !== null 
-                        ? selectedPM?.usia_pm.toString() 
-                        : activityData?.usia_pm !== undefined && activityData?.usia_pm !== null
-                        ? activityData?.usia_pm.toString()
+                      selectedPM.usia_pm !== undefined && selectedPM.usia_pm !== null
+                        ? selectedPM.usia_pm.toString()
                         : "Tidak ada data"
                     }
                     readOnly
@@ -1024,7 +1303,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">NIK</label>
                   <input
                     type="text"
-                    value={selectedPM?.nik || activityData?.nik || "Tidak ada data"}
+                    value={selectedPM.nik || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1033,7 +1312,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">No KK</label>
                   <input
                     type="text"
-                    value={selectedPM?.no_kk || activityData?.no_kk || "Tidak ada data"}
+                    value={selectedPM.no_kk || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1042,7 +1321,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Tempat Lahir</label>
                   <input
                     type="text"
-                    value={selectedPM?.tempat_lahir || activityData?.tempat_lahir || "Tidak ada data"}
+                    value={selectedPM.tempat_lahir || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1051,7 +1330,11 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
                   <input
                     type="text"
-                    value={selectedPM?.tgl_lahir || activityData?.tgl_lahir || "Tidak ada data"}
+                    value={
+                      selectedPM?.tgl_lahir 
+                        ? formatDisplayDate(selectedPM.tgl_lahir)
+                        : "Tidak ada data"
+                    }
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1060,7 +1343,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Status Marital</label>
                   <input
                     type="text"
-                    value={selectedPM?.status_marital || activityData?.status_marital || "Tidak ada data"}
+                    value={selectedPM.status_marital || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1069,7 +1352,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                   <label className="block text-sm font-medium text-gray-700">Agama</label>
                   <input
                     type="text"
-                    value={selectedPM?.agama || activityData?.agama || "Tidak ada data"}
+                    value={selectedPM.agama || "Tidak ada data"}
                     readOnly
                     className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
                   />
@@ -1077,6 +1360,7 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
               </div>
             )}
             
+            {/* Kegiatan */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Kegiatan</label>
               <input
@@ -1084,10 +1368,15 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 name="kegiatan"
                 value={formData.kegiatan}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.kegiatan ? 'border-red-500' : 'border-gray-300'}`}
+                required
               />
+              {validationErrors.kegiatan && (
+                <p className="mt-1 text-sm text-red-600">Kegiatan wajib diisi</p>
+              )}
             </div>
             
+            {/* Rumpun Program */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Rumpun Program</label>
               <input
@@ -1095,10 +1384,15 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 name="rumpun_program"
                 value={formData.rumpun_program}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.rumpun_program ? 'border-red-500' : 'border-gray-300'}`}
+                required
               />
+              {validationErrors.rumpun_program && (
+                <p className="mt-1 text-sm text-red-600">Rumpun program wajib diisi</p>
+              )}
             </div>
             
+            {/* Infaq */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Infaq</label>
               <input
@@ -1106,354 +1400,236 @@ export default function AdminEditActivityPage({ params }: { params: { id: string
                 name="infaq"
                 value={formData.infaq}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.infaq ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {validationErrors.infaq && (
+                <p className="mt-1 text-sm text-red-600">Infaq wajib diisi</p>
+              )}
             </div>
           </div>
           
-          <div className="sm:col-span-2 mt-6">
-            <label className="block text-sm font-medium text-gray-700">Dokumentasi</label>
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-              <div className="space-y-1 text-center">
-                <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
-                  stroke="currentColor"
-                  fill="none"
-                  viewBox="0 0 48 48"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28M8 32l4 4m4-24h8m-4-4v8m-12 4h.02"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <div className="flex text-sm text-gray-600">
-                  <label
-                    htmlFor="documentation-upload"
-                    className="relative cursor-pointer bg-white rounded-md font-medium text-green-600 hover:text-green-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-green-500"
-                  >
-                    <span>Upload a file</span>
-                    <input
-                      id="documentation-upload"
-                      name="documentation-upload"
-                      type="file"
-                      className="sr-only"
-                      multiple
-                      accept="image/*"
-                      onChange={handleDocumentationFileChange}
-                    />
-                  </label>
-                  <p className="pl-1">or drag and drop</p>
-                </div>
-                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-              </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Dokumentasi Aktivitas</label>
+            <FileUpload
+              onFilesChange={setNewDocumentationFiles}
+              maxFiles={5}
+              acceptedTypes={["image/*"]}
+            />
+            
+            {/* Existing Documentation Gallery with Soft Delete Support */}
+            <div className="mt-4">
+              <DocumentationGallery 
+                activityId={activityId}
+                documentation={existingDocumentation.map(doc => ({
+                  id: doc.id,
+                  url: doc.url,
+                  created_at: doc.created_at || new Date().toISOString()
+                }))}
+                onRemove={removeExistingDocumentation}
+                editable={true}
+                softDeletedDocumentation={softDeletedDocumentation}
+                onUndoDelete={undoDeleteDocumentation}
+                onDeleteSelected={removeSelectedDocumentation}
+              />
             </div>
-            
-            {existingDocumentation.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium text-gray-700">Dokumentasi yang sudah ada:</h4>
-                <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                  {existingDocumentation.map((doc) => (
-                    <li key={doc.id} className="flex items-center justify-between py-3 pl-3 pr-4 text-sm">
-                      <div className="flex w-0 flex-1 items-center">
-                        <svg
-                          className="h-5 w-5 flex-shrink-0 text-gray-400"
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <span className="ml-2 w-0 flex-1 truncate">{doc.url.split('/').pop()}</span>
-                      </div>
-                      <div className="ml-4 flex-shrink-0">
-                        <button
-                          type="button"
-                          className="font-medium text-red-600 hover:text-red-500"
-                          onClick={() => removeExistingDocumentation(doc.id)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            
-            {documentationFiles.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium text-gray-700">File yang dipilih:</h4>
-                <ul className="mt-2 divide-y divide-gray-200 rounded-md border border-gray-200">
-                  {documentationFiles.map((file, index) => (
-                    <li key={index} className="flex items-center justify-between py-3 pl-3 pr-4 text-sm">
-                      <div className="flex w-0 flex-1 items-center">
-                        <svg
-                          className="h-5 w-5 flex-shrink-0 text-gray-400"
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <span className="ml-2 w-0 flex-1 truncate">{file.name}</span>
-                      </div>
-                      <div className="ml-4 flex-shrink-0">
-                        <button
-                          type="button"
-                          className="font-medium text-red-600 hover:text-red-500"
-                          onClick={() => removeDocumentationFile(index)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
           
           <div className="flex justify-end space-x-3 mt-6">
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push('/dashboard')}
-            >
-              Batal
+              onClick={() => router.push("/admin")}>
+              Kembali
             </Button>
             <Button
               type="submit"
-              className="bg-green-600 hover:bg-green-700"
               disabled={loadingData}
             >
-              {loadingData ? "Menyimpan..." : "Simpan"}
+              {loadingData ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
           </div>
         </form>
       </div>
 
+      {/* Create Pemesan Modal */}
       {showCreatePemesan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50" style={{ zIndex: 9999 }}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md border-4 border-red-500">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Tambah Pemesan Baru</h3>
-                <button
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-medium mb-4">Tambah Pemesan Baru</h3>
+            <form onSubmit={handleCreatePemesan}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
+                <input
+                  type="text"
+                  value={newPemesan.nama_pemesan}
+                  onChange={(e) => setNewPemesan({...newPemesan, nama_pemesan: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">No HP</label>
+                <input
+                  type="text"
+                  value={newPemesan.hp}
+                  onChange={(e) => setNewPemesan({...newPemesan, hp: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowCreatePemesan(false)}
-                  className="text-gray-400 hover:text-gray-500 text-2xl font-bold"
                 >
-                  &times;
-                </button>
+                  Batal
+                </Button>
+                <Button type="submit">Simpan</Button>
               </div>
-              <form onSubmit={handleCreatePemesan}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Nama Pemesan</label>
-                    <input
-                      type="text"
-                      value={newPemesan.nama_pemesan}
-                      onChange={(e) => setNewPemesan({...newPemesan, nama_pemesan: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">No HP</label>
-                    <input
-                      type="text"
-                      value={newPemesan.hp}
-                      onChange={(e) => setNewPemesan({...newPemesan, hp: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreatePemesan(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Simpan
-                  </button>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
         </div>
       )}
 
+      {/* Create PM Modal */}
       {showCreatePM && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50" style={{ zIndex: 9999 }}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border-4 border-blue-500">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Tambah PM Baru</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowCreatePM(false)}
-                  className="text-gray-400 hover:text-gray-500 text-2xl font-bold"
-                >
-                  &times;
-                </button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-medium mb-4">Tambah Penerima Manfaat Baru</h3>
+            <form onSubmit={handleCreatePM}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Nama PM</label>
+                <input
+                  type="text"
+                  value={newPM.nama_pm}
+                  onChange={(e) => setNewPM({...newPM, nama_pm: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  required
+                />
               </div>
-              <form onSubmit={handleCreatePM}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Nama PM</label>
-                    <input
-                      type="text"
-                      value={newPM.nama_pm}
-                      onChange={(e) => setNewPM({...newPM, nama_pm: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Alamat</label>
-                    <textarea
-                      value={newPM.alamat_pm}
-                      onChange={(e) => setNewPM({...newPM, alamat_pm: e.target.value})}
-                      rows={3}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Jenis Kelamin</label>
-                    <select
-                      value={newPM.jenis_kelamin_pm}
-                      onChange={(e) => setNewPM({...newPM, jenis_kelamin_pm: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    >
-                      <option value="">Pilih Jenis Kelamin</option>
-                      <option value="Laki-laki">Laki-laki</option>
-                      <option value="Perempuan">Perempuan</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Usia</label>
-                    <input
-                      type="number"
-                      value={newPM.usia_pm}
-                      onChange={(e) => setNewPM({...newPM, usia_pm: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Asnaf</label>
-                    <select
-                      value={newPM.id_asnaf}
-                      onChange={(e) => setNewPM({...newPM, id_asnaf: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    >
-                      <option value="">Pilih Asnaf</option>
-                      {asnafs.map(asnaf => (
-                        <option key={asnaf.id} value={asnaf.id}>
-                          {asnaf.asnaf}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">NIK</label>
-                    <input
-                      type="text"
-                      value={newPM.nik}
-                      onChange={(e) => setNewPM({...newPM, nik: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">No KK</label>
-                    <input
-                      type="text"
-                      value={newPM.no_kk}
-                      onChange={(e) => setNewPM({...newPM, no_kk: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Tempat Lahir</label>
-                    <input
-                      type="text"
-                      value={newPM.tempat_lahir}
-                      onChange={(e) => setNewPM({...newPM, tempat_lahir: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
-                    <input
-                      type="date"
-                      value={newPM.tgl_lahir}
-                      onChange={(e) => setNewPM({...newPM, tgl_lahir: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Status Marital</label>
-                    <select
-                      value={newPM.status_marital}
-                      onChange={(e) => setNewPM({...newPM, status_marital: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    >
-                      <option value="">Pilih Status</option>
-                      <option value="Menikah">Menikah</option>
-                      <option value="Belum Menikah">Belum Menikah</option>
-                      <option value="Cerai">Cerai</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Agama</label>
-                    <input
-                      type="text"
-                      value={newPM.agama}
-                      onChange={(e) => setNewPM({...newPM, agama: e.target.value})}
-                      className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreatePM(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Simpan
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Alamat</label>
+                <textarea
+                  value={newPM.alamat_pm}
+                  onChange={(e) => setNewPM({...newPM, alamat_pm: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Jenis Kelamin</label>
+                <select
+                  value={newPM.jenis_kelamin_pm}
+                  onChange={(e) => setNewPM({...newPM, jenis_kelamin_pm: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                >
+                  <option value="">Pilih Jenis Kelamin</option>
+                  <option value="l">Laki-laki</option>
+                  <option value="p">Perempuan</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Usia</label>
+                <input
+                  type="number"
+                  value={newPM.usia_pm}
+                  onChange={(e) => setNewPM({...newPM, usia_pm: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Asnaf</label>
+                <select
+                  value={newPM.id_asnaf}
+                  onChange={(e) => setNewPM({...newPM, id_asnaf: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                >
+                  <option value="">Pilih Asnaf</option>
+                  {asnafs.map(asnaf => (
+                    <option key={asnaf.id} value={asnaf.id}>{asnaf.asnaf}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">NIK</label>
+                <input
+                  type="text"
+                  value={newPM.nik}
+                  onChange={(e) => setNewPM({...newPM, nik: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">No KK</label>
+                <input
+                  type="text"
+                  value={newPM.no_kk}
+                  onChange={(e) => setNewPM({...newPM, no_kk: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Tempat Lahir</label>
+                <input
+                  type="text"
+                  value={newPM.tempat_lahir}
+                  onChange={(e) => setNewPM({...newPM, tempat_lahir: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Tanggal Lahir</label>
+                <input
+                  type="date"
+                  value={newPM.tgl_lahir}
+                  onChange={(e) => setNewPM({...newPM, tgl_lahir: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Status Marital</label>
+                <input
+                  type="text"
+                  value={newPM.status_marital}
+                  onChange={(e) => setNewPM({...newPM, status_marital: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Agama</label>
+                <input
+                  type="text"
+                  value={newPM.agama}
+                  onChange={(e) => setNewPM({...newPM, agama: e.target.value})}
+                  className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreatePM(false)}
+                >
+                  Batal
+                </Button>
+                <Button type="submit">Simpan</Button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModalOpen}
+        onClose={() => {
+          setAlertModalOpen(false);
+          // Redirect to admin page after successful update
+          router.push("/admin");
+        }}
+        title={alertModalTitle}
+        message={alertModalMessage}
+        type={alertModalType}
+      />
     </DashboardLayout>
-  )
+  );
 }
