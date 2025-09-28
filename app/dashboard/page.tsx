@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import ActivitiesGrid from "@/components/activities-grid"
+import ActivityFilter, { ActivityFilterRef } from "@/components/activity-filter"
 import { Button } from "@/components/ui/button"
 import DashboardLayout from "@/components/dashboard-layout"
 import { BASE_URL } from "@/lib/config"
@@ -59,6 +60,9 @@ export default function DashboardPage() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [activitiesLoading, setActivitiesLoading] = useState(true)
   const [initialPage, setInitialPage] = useState(1) // New state for initial page
+  const [filters, setFilters] = useState({})
+  const [isFilterVisible, setIsFilterVisible] = useState(false)
+  const filterRef = useRef<ActivityFilterRef>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -77,16 +81,19 @@ export default function DashboardPage() {
     }
   }, [searchParams])
 
+  // Fetch activities when user or filters change
   useEffect(() => {
     if (user && user.role === "driver") {
       fetchDriverActivities()
     }
-  }, [user])
+  }, [user, filters]) // Added filters as dependency
 
   const fetchDriverActivities = async () => {
     try {
       setActivitiesLoading(true)
-      const response = await fetch(`/api/driver/activities`)
+      // Include filters in the API request
+      const filterParams = new URLSearchParams(filters as any).toString()
+      const response = await fetch(`/api/driver/activities${filterParams ? `?${filterParams}` : ''}`)
       if (response.ok) {
         const data = await response.json()
         setActivities(data)
@@ -98,6 +105,12 @@ export default function DashboardPage() {
     } finally {
       setActivitiesLoading(false)
     }
+  }
+
+  // Handle filter changes
+  const handleFilterChange = (newFilters: any) => {
+    setInitialPage(1) // Reset to first page when filters change
+    setFilters(newFilters)
   }
 
   if (loading || activitiesLoading) {
@@ -146,11 +159,40 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="mt-6">
+          {/* Filter Component */}
+          <ActivityFilter 
+            ref={filterRef} 
+            onFilterChange={handleFilterChange}
+            isFilterVisible={isFilterVisible}
+            setIsFilterVisible={setIsFilterVisible}
+          />
+          
           <ActivitiesGrid 
             activities={activities} 
             isAdmin={false}
             onAddNew={fetchDriverActivities}
             initialPage={initialPage} // Pass initialPage to ActivitiesGrid
+            filterIcon={
+              <button
+                onClick={() => setIsFilterVisible(!isFilterVisible)}
+                className="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+              </button>
+            }
           />
         </div>
       </div>

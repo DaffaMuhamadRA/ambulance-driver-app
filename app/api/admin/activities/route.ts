@@ -39,7 +39,37 @@ export async function GET(request: Request) {
       )
     }
     
-    // Fetch all activities with related data
+    // Get query parameters for filtering
+    const url = new URL(request.url)
+    const dateFrom = url.searchParams.get('dateFrom')
+    const dateTo = url.searchParams.get('dateTo')
+    const driverId = url.searchParams.get('driverId')
+    const location = url.searchParams.get('location')
+    
+    // Build the query with filtering conditions
+    let queryConditions = ""
+    const queryParams = []
+    
+    // Date range filter
+    if (dateFrom && dateTo) {
+      queryConditions += ` AND aa.tgl BETWEEN '${dateFrom}' AND '${dateTo}'`
+    } else if (dateFrom) {
+      queryConditions += ` AND aa.tgl >= '${dateFrom}'`
+    } else if (dateTo) {
+      queryConditions += ` AND aa.tgl <= '${dateTo}'`
+    }
+    
+    // Driver ID filter
+    if (driverId) {
+      queryConditions += ` AND aa.id_driver = ${driverId}`
+    }
+    
+    // Location filter (from or destination)
+    if (location) {
+      queryConditions += ` AND (aa.dari ILIKE '%${location}%' OR aa.tujuan ILIKE '%${location}%')`
+    }
+    
+    // Fetch all activities with related data and filters
     const result = await sql`
       SELECT 
         aa.id,
@@ -85,6 +115,7 @@ export async function GET(request: Request) {
       LEFT JOIN cms_users cu ON aa.id_driver = cu.id
       LEFT JOIN pemesan p ON aa.id_pemesan = p.id  -- Join with pemesan table
       LEFT JOIN penerima_manfaat pm ON aa.id_penerima_manfaat = pm.id  -- Join with penerima_manfaat table
+      WHERE 1=1 ${sql.unsafe(queryConditions)}
       ORDER BY aa.tgl DESC, aa.jam_berangkat DESC
       LIMIT 100
     `
@@ -342,7 +373,6 @@ export async function POST(request: Request) {
       jam_berangkat: jam_berangkatValue,
       jam_pulang: jam_pulangValue,
       id_driver: id_driver_num,
-      asisten_luar_kota: asisten_luar_kotaValue,
       area: areaValue,
       jml_hari_luar_kota,
       dari: dariValue,

@@ -34,7 +34,15 @@ export async function middleware(request: NextRequest) {
     
     // Don't apply middleware to public routes and static assets
     if (isPublicRoute) {
-      return NextResponse.next()
+      const response = NextResponse.next()
+      
+      // Add CSP header for public routes
+      response.headers.set(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https://*.vercel-scripts.com; frame-ancestors 'none';"
+      )
+      
+      return response
     }
 
     // Get session token from cookies
@@ -47,11 +55,27 @@ export async function middleware(request: NextRequest) {
 
     // For authenticated users, allow access to all routes
     // Role-based access control is handled at the page level
-    return NextResponse.next()
+    const response = NextResponse.next()
+    
+    // Add CSP header for authenticated routes
+    response.headers.set(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https://*.vercel-scripts.com; frame-ancestors 'none';"
+    )
+    
+    return response
   } catch (error) {
     console.error("Middleware error:", error)
     // In case of middleware error, allow the request to proceed
-    return NextResponse.next()
+    const response = NextResponse.next()
+    
+    // Add basic CSP header even in error cases
+    response.headers.set(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https://*.vercel-scripts.com; frame-ancestors 'none';"
+    )
+    
+    return response
   }
 }
 

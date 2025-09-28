@@ -20,15 +20,23 @@ interface ActivitiesGridProps {
   isAdmin?: boolean
   onAddNew?: () => void
   initialPage?: number // Add initialPage prop
+  filterIcon?: React.ReactNode
 }
 
-export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, initialPage = 1 }: ActivitiesGridProps) {
+export default function ActivitiesGrid({ 
+  activities, 
+  isAdmin = false, 
+  onAddNew, 
+  initialPage = 1,
+  filterIcon
+}: ActivitiesGridProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [currentPage, setCurrentPage] = useState(initialPage) // Use initialPage for initial state
   const [itemsPerPage, setItemsPerPage] = useState(6)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchTerm, setSearchTerm] = useState("") // Current input value
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("") // Applied filter value
   const [currentActivities, setCurrentActivities] = useState<Activity[]>(activities)
   // Modal states
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
@@ -39,13 +47,13 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
   const [deleteAction, setDeleteAction] = useState<() => void>(() => () => {})
   const gridRef = useRef<HTMLDivElement>(null)
 
-  // Filter activities based on search term
+  // Filter activities based on applied search term
   const filteredActivities = currentActivities.filter(
     (activity) =>
-      (activity.detail || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (activity.dari || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (activity.tujuan || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (activity.ambulance.nopol || "").toLowerCase().includes(searchTerm.toLowerCase())
+      (activity.detail || "").toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+      (activity.dari || "").toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+      (activity.tujuan || "").toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+      (activity.ambulance.nopol || "").toLowerCase().includes(appliedSearchTerm.toLowerCase())
   )
 
   const totalPages = Math.ceil(filteredActivities.length / itemsPerPage)
@@ -104,6 +112,17 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
+  }
+
+  // Function to apply the search filter
+  const handleApplyFilter = () => {
+    setAppliedSearchTerm(searchTerm)
+  }
+
+  // Function to reset the search filter
+  const handleResetFilter = () => {
+    setSearchTerm("")
+    setAppliedSearchTerm("")
   }
 
   const handleDelete = async (activityId: number) => {
@@ -247,6 +266,11 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 w-full text-sm focus:ring-green-500 focus:border-green-500 shadow-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleApplyFilter()
+                }
+              }}
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
@@ -266,6 +290,9 @@ export default function ActivitiesGrid({ activities, isAdmin = false, onAddNew, 
               </svg>
             </div>
           </div>
+          
+          {/* Filter Icon */}
+          {filterIcon}
           <select
             value={itemsPerPage}
             onChange={(e) => {

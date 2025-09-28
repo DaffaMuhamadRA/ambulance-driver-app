@@ -15,14 +15,23 @@ interface ActivitiesTableProps {
   onAddNew?: () => void
   initialPage?: number
   onRefresh?: () => void
+  filterIcon?: React.ReactNode
 }
 
-export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, initialPage = 1, onRefresh }: ActivitiesTableProps) {
+export default function ActivitiesTable({ 
+  activities, 
+  isAdmin = true, 
+  onAddNew, 
+  initialPage = 1, 
+  onRefresh,
+  filterIcon
+}: ActivitiesTableProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [currentPage, setCurrentPage] = useState(initialPage)
   const [itemsPerPage, setItemsPerPage] = useState(10)
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchTerm, setSearchTerm] = useState("") // Current input value
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("") // Applied filter value
   const [selectedActivities, setSelectedActivities] = useState<number[]>([])
   const [bulkActionsOpen, setBulkActionsOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
@@ -36,14 +45,14 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
   const bulkActionsRef = useRef<HTMLDivElement>(null)
   const tableRef = useRef<HTMLDivElement>(null)
 
-  // Filter activities based on search term
+  // Filter activities based on applied search term
   const filteredActivities = activities.filter(
     (activity) =>
-      activity.detail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.dari.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.tujuan.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.ambulance.nopol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.user.name.toLowerCase().includes(searchTerm.toLowerCase())
+      activity.detail.toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+      activity.dari.toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+      activity.tujuan.toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+      activity.ambulance.nopol.toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+      activity.user.name.toLowerCase().includes(appliedSearchTerm.toLowerCase())
   )
 
   const totalPages = Math.ceil(filteredActivities.length / itemsPerPage)
@@ -108,6 +117,17 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
 
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+  }
+
+  // Function to apply the search filter
+  const handleApplyFilter = () => {
+    setAppliedSearchTerm(searchTerm)
+  }
+
+  // Function to reset the search filter
+  const handleResetFilter = () => {
+    setSearchTerm("")
+    setAppliedSearchTerm("")
   }
 
   const handleDelete = async (activityId: number) => {
@@ -233,6 +253,11 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 w-full text-sm focus:ring-green-500 focus:border-green-500 shadow-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleApplyFilter()
+                }
+              }}
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
@@ -252,6 +277,24 @@ export default function ActivitiesTable({ activities, isAdmin = true, onAddNew, 
               </svg>
             </div>
           </div>
+          {/* Apply and Reset buttons for search */}
+          <div className="flex gap-2">
+            <Button
+              onClick={handleApplyFilter}
+              className="px-3 py-2 text-sm bg-green-600 text-white hover:bg-green-700"
+            >
+              Terapkan
+            </Button>
+            <Button
+              onClick={handleResetFilter}
+              variant="outline"
+              className="px-3 py-2 text-sm"
+            >
+              Reset
+            </Button>
+          </div>
+          {/* Filter Icon - This will be passed from parent */}
+          {filterIcon}
           <select
             value={itemsPerPage}
             onChange={(e) => {

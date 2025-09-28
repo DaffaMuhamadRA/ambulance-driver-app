@@ -154,6 +154,32 @@ We have implemented comprehensive tests to verify the functionality of our valid
 
 For detailed information about the security implementation, see [SECURITY_IMPLEMENTATION_SUMMARY.md](SECURITY_IMPLEMENTATION_SUMMARY.md).
 
+## Filter Functionality
+
+This application now includes enhanced filter functionality for both admin and driver dashboards:
+
+### Admin Filters
+- Date range filtering (between two dates)
+- Driver name filtering
+- Location filtering (matches either "dari" or "tujuan" fields)
+
+### Driver Filters
+- Date range filtering (between two dates)
+- Location filtering (matches either "dari" or "tujuan" fields)
+
+### Key Features
+- Filter area hidden by default with toggle visibility
+- Apply button to manually trigger filter application
+- Reset button to clear all filter values
+- No automatic filtering during input (performance improvement)
+
+### Documentation
+For detailed information on how to use these filters, see:
+- [HOW_TO_USE_FILTERS.md](HOW_TO_USE_FILTERS.md) - User guide
+- [DEVELOPER_FILTER_GUIDE.md](DEVELOPER_FILTER_GUIDE.md) - Developer guide
+- [FILTER_FINAL_IMPLEMENTATION.md](FILTER_FINAL_IMPLEMENTATION.md) - Technical implementation details
+- [FINAL_FILTER_IMPLEMENTATION_REPORT.md](FINAL_FILTER_IMPLEMENTATION_REPORT.md) - Complete implementation report
+
 ## Deployment ke Vercel
 
 ### Persyaratan
