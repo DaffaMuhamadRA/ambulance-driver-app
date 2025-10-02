@@ -113,6 +113,28 @@ Database Neon sudah berisi data pengguna yang dapat digunakan:
 
 **Catatan**: Database Neon mungkin berisi lebih banyak pengguna dengan berbagai email dan kredensial. Gunakan kredensial yang sesuai dengan data yang ada di database.
 
+## Fitur Lupa Password
+
+Aplikasi ini sekarang menyertakan fitur lupa password yang memungkinkan pengguna untuk mereset password mereka jika lupa:
+
+### Cara Kerja
+1. Pengguna mengklik tautan "Lupa password?" di halaman login
+2. Pengguna memasukkan email mereka
+3. Sistem menghasilkan token reset dan menyimpannya di database
+4. Pengguna menerima token (dalam produksi dikirim via email)
+5. Pengguna memasukkan token dan password baru
+6. Sistem memverifikasi token dan memperbarui password
+
+### Keamanan
+- Token dihasilkan secara acak dan aman
+- Token kedaluwarsa dalam 1 jam
+- Password baru di-hash menggunakan bcrypt sebelum disimpan
+- Pencegahan enumerasi email dengan respons yang konsisten
+
+### Dokumentasi
+Untuk informasi teknis detail tentang implementasi fitur ini, lihat:
+- [PASSWORD_RESET_IMPLEMENTATION.md](PASSWORD_RESET_IMPLEMENTATION.md) - Dokumentasi implementasi lengkap
+
 ## Security Implementation
 
 This application implements comprehensive security measures to prevent common web vulnerabilities:

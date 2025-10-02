@@ -12,7 +12,7 @@ async function checkSchema() {
     const sql = neon(connectionString);
     
     // Check if required tables exist
-    const requiredTables = ['cms_users', 'ambulan', 'ambulan_activity', 'event_activity', 'sessions','dokumentasi_activity'];
+    const requiredTables = ['cms_users', 'ambulan', 'ambulan_activity', 'event_activity', 'sessions','dokumentasi_activity', 'driver'];
     
     console.log('\nChecking required tables:');
     for (const tableName of requiredTables) {

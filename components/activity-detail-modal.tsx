@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import type { Activity } from "@/lib/activities"
+import type { DetailedActivity } from "@/lib/activities"
 
 interface ActivityDetailModalProps {
-  activity: Activity | null
+  activity: DetailedActivity | null
   isOpen: boolean
   onClose: () => void
 }

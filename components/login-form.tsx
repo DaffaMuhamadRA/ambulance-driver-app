@@ -94,6 +94,18 @@ export default function LoginForm() {
         />
       </div>
 
+      <div className="flex items-center justify-between">
+        <div className="text-sm">
+          <button
+            type="button"
+            onClick={() => router.push("/reset-password")}
+            className="font-medium text-green-600 hover:text-green-500"
+          >
+            Lupa password?
+          </button>
+        </div>
+      </div>
+
       <div>
         <Button
           type="submit"
