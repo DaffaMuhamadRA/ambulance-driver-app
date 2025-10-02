@@ -1,40 +1,56 @@
-// Test database connection
+// Test script to verify database connection in Vercel-like environment
 const { neon } = require('@neondatabase/serverless');
 
-// Use the same configuration as in db.ts
-const PGHOST = process.env.PGHOST || 'ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech';
-const PGDATABASE = process.env.PGDATABASE || 'neondb';
-const PGUSER = process.env.PGUSER || 'neondb_owner';
-const PGPASSWORD = process.env.PGPASSWORD || 'npg_vGgHE25STeCr';
-const PGSSLMODE = process.env.PGSSLMODE || 'require';
-const PGCHANNELBINDING = process.env.PGCHANNELBINDING || 'require';
+// Simulate Vercel environment variables
+console.log('Testing database connection with Vercel-like environment...');
 
-// Create connection string using the provided Neon PostgreSQL parameters
+// Use the same database configuration as Vercel
+const PGHOST = 'ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech';
+const PGDATABASE = 'neondb';
+const PGUSER = 'neondb_owner';
+const PGPASSWORD = 'npg_vGgHE25STeCr';
+const PGSSLMODE = 'require';
+const PGCHANNELBINDING = 'require';
+
 const connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}/${PGDATABASE}?sslmode=${PGSSLMODE}&channel_binding=${PGCHANNELBINDING}`;
+console.log('Connection string:', connectionString);
 
-console.log('Testing database connection with:');
-console.log(`Host: ${PGHOST}`);
-console.log(`Database: ${PGDATABASE}`);
-console.log(`User: ${PGUSER}`);
-console.log(`SSL Mode: ${PGSSLMODE}`);
-console.log(`Channel Binding: ${PGCHANNELBINDING}`);
-
-async function testConnection() {
+async function testDBConnection() {
   try {
-    console.log('\nAttempting to connect...');
+    console.log('Testing database connection...');
     const sql = neon(connectionString);
     
-    // Simple query to test connection
-    const result = await sql`SELECT version()`;
-    console.log('✅ Connection successful!');
-    console.log('Database version:', result[0].version);
+    // Test database connection
+    console.log('Testing database connection...');
+    const testResult = await sql`SELECT NOW() as current_time, version() as db_version`;
+    console.log('Database connection successful:', testResult);
+    
+    // Test fetching users
+    console.log('\nTesting user fetch...');
+    const userResult = await sql`
+      SELECT id, name, email, id_cms_privileges, status
+      FROM cms_users 
+      LIMIT 5
+    `;
+    
+    console.log('User fetch successful. Found', userResult.length, 'users');
+    userResult.forEach((user, index) => {
+      console.log(`User ${index + 1}:`, {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.id_cms_privileges == 1 ? "admin" : "driver",
+        status: user.status
+      });
+    });
+    
+    console.log('\n🎉 Database connection test successful!');
+    
   } catch (error) {
-    console.log('❌ Connection failed!');
-    console.error('Error:', error.message);
-    if (error.code) {
-      console.error('Error code:', error.code);
-    }
+    console.error('❌ Database connection test failed:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error stack:', error.stack);
   }
 }
 
-testConnection();
+testDBConnection();

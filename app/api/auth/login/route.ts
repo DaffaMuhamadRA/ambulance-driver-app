@@ -7,12 +7,24 @@ export async function POST(request: NextRequest) {
   try {
     console.log("Login API called");
     
+    // Log request details for debugging
+    console.log("Request URL:", request.url);
+    console.log("Request method:", request.method);
+    console.log("Request headers:", Object.fromEntries(request.headers));
+    
     let jsonData;
     try {
       jsonData = await request.json();
       console.log("Received JSON data:", jsonData);
     } catch (jsonError: any) {
       console.error("JSON parsing error:", jsonError);
+      // Log the raw body for debugging
+      try {
+        const text = await request.text();
+        console.log("Raw request body:", text);
+      } catch (textError) {
+        console.error("Error reading raw body:", textError);
+      }
       return NextResponse.json({ error: "Invalid JSON format in request body" }, { status: 400 });
     }
     
@@ -82,6 +94,6 @@ export async function POST(request: NextRequest) {
     if (error.message && error.message.includes("database")) {
       return NextResponse.json({ error: "Koneksi database gagal. Silakan coba lagi nanti." }, { status: 500 });
     }
-    return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });
+    return NextResponse.json({ error: "Terjadi kesalahan server", details: error.message }, { status: 500 });
   }
 }

@@ -14,10 +14,10 @@
     }
   ],
   "env": {
-    "PGHOST": "ep-orange-hall-a1dt84vj-pooler.ap-southeast-1.aws.neon.tech",
+    "PGHOST": "ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech",
     "PGDATABASE": "neondb",
     "PGUSER": "neondb_owner",
-    "PGPASSWORD": "npg_26wQetjypolP",
+    "PGPASSWORD": "npg_vGgHE25STeCr",
     "PGSSLMODE": "require",
     "PGCHANNELBINDING": "require"
   }
