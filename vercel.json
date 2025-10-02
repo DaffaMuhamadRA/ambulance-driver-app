@@ -19,7 +19,6 @@
     "PGUSER": "neondb_owner",
     "PGPASSWORD": "npg_26wQetjypolP",
     "PGSSLMODE": "require",
-    "PGCHANNELBINDING": "require",
-    "TZ": "Asia/Jakarta"
+    "PGCHANNELBINDING": "require"
   }
 }

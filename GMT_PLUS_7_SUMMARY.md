@@ -5,53 +5,54 @@ Dokumen ini merangkum semua perubahan yang telah dilakukan untuk memastikan kons
 ## Perubahan yang Dilakukan
 
 ### 1. Pembuatan Fungsi Utilitas Zona Waktu
-- **File**: `lib/timezone.ts`
+- **File**: [lib/timezone.ts](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts)
 - **Deskripsi**: Membuat fungsi utilitas terpusat untuk penanganan zona waktu GMT+7
 - **Fungsi yang dibuat**:
-  - `formatDisplayDate`: Untuk menampilkan tanggal dengan format Indonesia menggunakan GMT+7
-  - `formatInputDate`: Untuk input field HTML menggunakan GMT+7
-  - `getCurrentDateInGMT7`: Untuk mendapatkan tanggal saat ini dalam GMT+7
+  - [formatDisplayDate](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts#L7-L15): Untuk menampilkan tanggal dengan format Indonesia menggunakan GMT+7
+  - [formatInputDate](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts#L18-L45): Untuk input field HTML menggunakan GMT+7
+  - [getCurrentDateInGMT7](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts#L48-L56): Untuk mendapatkan tanggal saat ini dalam GMT+7
 
 ### 2. Pembaruan Library Activities
-- **File**: `lib/activities.ts`
+- **File**: [lib/activities.ts](file:///c:/laragon/www/Ambulan-CitaSehat/lib/activities.ts)
 - **Deskripsi**: Memperbarui implementasi penanganan tanggal untuk menggunakan fungsi utilitas baru
 - **Perubahan**:
-  - Mengimpor fungsi `formatInputDate` dari `lib/timezone`
+  - Mengimpor fungsi [formatInputDate](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts#L18-L45) dari [lib/timezone](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts)
   - Mengganti implementasi format tanggal dengan fungsi utilitas
 
 ### 3. Pembaruan Halaman Detail Aktivitas
-- **File**: `app/activities/[id]/page.tsx`
+- **File**: [app/activities/[id]/page.tsx](file:///c:/laragon/www/Ambulan-CitaSehat/app/activities/%5Bid%5D/page.tsx)
 - **Deskripsi**: Memperbarui fungsi format tanggal untuk menggunakan fungsi utilitas
 - **Perubahan**:
-  - Mengimpor fungsi `formatDisplayDate` dari `lib/timezone`
-  - Mengganti implementasi `formatDate` dengan fungsi utilitas
+  - Mengimpor fungsi [formatDisplayDate](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts#L7-L15) dari [lib/timezone](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts)
+  - Mengganti implementasi [formatDate](file:///c:/laragon/www/Ambulan-CitaSehat/scripts/test-get-activity-by-id.js#L70-L72) dengan fungsi utilitas
 
 ### 4. Pembaruan Halaman Detail Aktivitas Admin
-- **File**: `app/admin/activities/[id]/page.tsx`
+- **File**: [app/admin/activities/[id]/page.tsx](file:///c:/laragon/www/Ambulan-CitaSehat/app/admin/activities/%5Bid%5D/page.tsx)
 - **Deskripsi**: Memperbarui fungsi format tanggal untuk menggunakan fungsi utilitas
 - **Perubahan**:
-  - Mengimpor fungsi `formatDisplayDate` dari `lib/timezone`
-  - Mengganti implementasi `formatDate` dengan fungsi utilitas
+  - Mengimpor fungsi [formatDisplayDate](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts#L7-L15) dari [lib/timezone](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts)
+  - Mengganti implementasi [formatDate](file:///c:/laragon/www/Ambulan-CitaSehat/scripts/test-get-activity-by-id.js#L70-L72) dengan fungsi utilitas
 
 ### 5. Pembaruan Halaman Edit Aktivitas
-- **File**: `app/activities/[id]/edit/page.tsx`
+- **File**: [app/activities/[id]/edit/page.tsx](file:///c:/laragon/www/Ambulan-CitaSehat/app/activities/%5Bid%5D/edit/page.tsx)
 - **Deskripsi**: Memperbarui penanganan tanggal PM untuk menggunakan fungsi utilitas
 - **Perubahan**:
-  - Mengimpor fungsi `formatDisplayDate` dari `lib/timezone`
+  - Mengimpor fungsi [formatDisplayDate](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts#L7-L15) dari [lib/timezone](file:///c:/laragon/www/Ambulan-CitaSehat/lib/timezone.ts)
   - Mengganti implementasi format tanggal PM dengan fungsi utilitas
 
 ### 6. Konfigurasi Zona Waktu Server
-- **File**: `vercel.json`
+- **File**: [vercel.json](file:///c:/laragon/www/Ambulan-CitaSehat/vercel.json)
 - **Deskripsi**: Menambahkan pengaturan zona waktu GMT+7 untuk lingkungan server
 - **Perubahan**:
-  - Menambahkan variabel lingkungan `TZ` dengan nilai `Asia/Jakarta`
+  - ~~Menambahkan variabel lingkungan `TZ` dengan nilai `Asia/Jakarta`~~
+  - **Pembaruan**: Variabel lingkungan `TZ` telah dihapus karena tidak didukung oleh Vercel. Aplikasi menggunakan penanganan zona waktu internal.
 
 ### 7. Dokumentasi
-- **File**: `GMT_PLUS_7_IMPLEMENTATION.md`
+- **File**: [GMT_PLUS_7_IMPLEMENTATION.md](file:///c:/laragon/www/Ambulan-CitaSehat/GMT_PLUS_7_IMPLEMENTATION.md)
 - **Deskripsi**: Membuat dokumentasi lengkap tentang implementasi zona waktu GMT+7
 - **Isi**: Penjelasan tentang fungsi utilitas, implementasi, dan keuntungan
 
-- **File**: `GMT_PLUS_7_SUMMARY.md` (dokumen ini)
+- **File**: [GMT_PLUS_7_SUMMARY.md](file:///c:/laragon/www/Ambulan-CitaSehat/GMT_PLUS_7_SUMMARY.md) (dokumen ini)
 - **Deskripsi**: Ringkasan perubahan yang telah dilakukan
 
 ## Keuntungan Implementasi
