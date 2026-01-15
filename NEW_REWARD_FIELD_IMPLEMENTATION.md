@@ -27,13 +27,13 @@ The new Reward field is positioned immediately after the Jenis Pengantaran field
 
 ### Data Display
 The field uses the following logic to display the reward value:
-```javascript
+\`\`\`javascript
 value={
   formData.id_reward 
     ? rewards.find(r => r.id === parseInt(formData.id_reward))?.reward?.toLocaleString('id-ID') || ""
     : ""
 }
-```
+\`\`\`
 
 This code:
 1. Checks if a reward is selected (formData.id_reward is not empty)
@@ -44,14 +44,14 @@ This code:
 
 ### Read-Only Behavior
 The field is implemented as a read-only input:
-```html
+\`\`\`html
 <input
   type="text"
   value={/* reward value */}
   readOnly
   className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm bg-gray-100 sm:text-sm"
 />
-```
+\`\`\`
 
 The `readOnly` attribute prevents user input, and the `bg-gray-100` class gives it a visual indication that it's read-only.
 

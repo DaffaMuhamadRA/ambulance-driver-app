@@ -13,23 +13,23 @@ Fungsi utilitas zona waktu telah dibuat dalam file [lib/timezone.ts](file:///c:/
 ### 1. formatDisplayDate
 Mengubah tanggal untuk ditampilkan kepada pengguna dengan format Indonesia menggunakan zona waktu GMT+7.
 
-```typescript
+\`\`\`typescript
 formatDisplayDate(dateString: string): string
-```
+\`\`\`
 
 ### 2. formatInputDate
 Mengubah tanggal untuk input field HTML (YYYY-MM-DD) menggunakan zona waktu GMT+7.
 
-```typescript
+\`\`\`typescript
 formatInputDate(dateValue: any): string
-```
+\`\`\`
 
 ### 3. getCurrentDateInGMT7
 Mendapatkan tanggal saat ini dalam format yang sesuai untuk input field menggunakan zona waktu GMT+7.
 
-```typescript
+\`\`\`typescript
 getCurrentDateInGMT7(): string
-```
+\`\`\`
 
 ## Implementasi di Berbagai Bagian
 

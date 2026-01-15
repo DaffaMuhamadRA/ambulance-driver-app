@@ -20,9 +20,9 @@ This document describes the changes made to remove the `tgl_pulang` column from 
 ## Database Migration
 
 The column was removed using the following SQL command:
-```sql
+\`\`\`sql
 ALTER TABLE dokumentasi_activity DROP COLUMN tgl_pulang;
-```
+\`\`\`
 
 ## Verification
 

@@ -23,9 +23,9 @@ The application could not be deployed to Vercel due to the `TZ` environment vari
 ## Solution Approach
 
 The solution leverages the existing fallback mechanism in the application code:
-```typescript
+\`\`\`typescript
 export const TIMEZONE = process.env.TZ || 'Asia/Jakarta';
-```
+\`\`\`
 
 Combined with explicit timezone specification in all date formatting functions, this ensures consistent timezone handling across all environments without relying on system-level environment variables.
 

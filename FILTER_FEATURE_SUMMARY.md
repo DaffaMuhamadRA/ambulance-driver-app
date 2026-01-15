@@ -92,23 +92,23 @@ This document provides a comprehensive summary of the filter feature implementat
 ## API Endpoints
 
 ### Admin Activities
-```
+\`\`\`
 GET /api/admin/activities
 Query Parameters:
 - dateFrom (optional): Start date in YYYY-MM-DD format
 - dateTo (optional): End date in YYYY-MM-DD format
 - driverName (optional): Driver name search term
 - location (optional): Location search term (matches dari or tujuan)
-```
+\`\`\`
 
 ### Driver Activities
-```
+\`\`\`
 GET /api/driver/activities
 Query Parameters:
 - dateFrom (optional): Start date in YYYY-MM-DD format
 - dateTo (optional): End date in YYYY-MM-DD format
 - location (optional): Location search term (matches dari or tujuan)
-```
+\`\`\`
 
 ## User Interface
 

@@ -10,7 +10,7 @@ This document explains the implementation of automatic driver selection in the a
 #### Added useEffect Hook
 A new useEffect hook was added to automatically set the driver field to the current admin user:
 
-```typescript
+\`\`\`typescript
 // Set the driver to the current admin user when component mounts and user is available
 useEffect(() => {
   if (user && user.role === "admin" && user.id) {
@@ -20,7 +20,7 @@ useEffect(() => {
     }));
   }
 }, [user]);
-```
+\`\`\`
 
 This hook:
 1. Checks if the user is authenticated and has the "admin" role
@@ -31,13 +31,13 @@ This hook:
 #### Modified fetchActivityData Function
 The fetchActivityData function was also updated to ensure the driver field is populated with the current admin user if not already set:
 
-```typescript
+\`\`\`typescript
 setFormData({
   // ... other fields
   id_driver: activity.id_driver?.toString() || (user?.id?.toString() || ""),
   // ... other fields
 })
-```
+\`\`\`
 
 This ensures that:
 1. If the activity already has a driver assigned, that value is used

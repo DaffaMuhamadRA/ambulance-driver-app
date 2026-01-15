@@ -13,9 +13,9 @@ This document describes the implementation of the password reset feature for the
 ### 1. Database Schema
 The existing `cms_users` table already has a `token` column that can be used for password reset functionality:
 
-```sql
+\`\`\`sql
 - token (text) NULL
-```
+\`\`\`
 
 ### 2. API Endpoints
 
@@ -23,37 +23,37 @@ The existing `cms_users` table already has a `token` column that can be used for
 - **Endpoint**: `POST /api/auth/reset-password/request`
 - **Purpose**: Generates a reset token and stores it in the database
 - **Request Body**:
-  ```json
+  \`\`\`json
   {
     "email": "user@example.com"
   }
-  ```
+  \`\`\`
 - **Response**:
-  ```json
+  \`\`\`json
   {
     "success": true,
     "message": "Jika email Anda terdaftar, Anda akan menerima instruksi untuk mereset password Anda."
   }
-  ```
+  \`\`\`
 
 #### b. Verify Token and Reset Password
 - **Endpoint**: `POST /api/auth/reset-password/verify`
 - **Purpose**: Verifies the reset token and updates the user's password
 - **Request Body**:
-  ```json
+  \`\`\`json
   {
     "token": "reset_token_here",
     "password": "new_password",
     "confirmPassword": "new_password"
   }
-  ```
+  \`\`\`
 - **Response**:
-  ```json
+  \`\`\`json
   {
     "success": true,
     "message": "Password berhasil diubah. Anda dapat login dengan password baru Anda."
   }
-  ```
+  \`\`\`
 
 ### 3. Frontend Components
 

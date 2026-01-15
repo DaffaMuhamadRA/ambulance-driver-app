@@ -9,9 +9,9 @@ This document explains the implementation of loading animation during delete ope
 
 #### Added State
 - Added a new state variable `deleting` to track the delete operation status:
-  ```typescript
+  \`\`\`typescript
   const [deleting, setDeleting] = useState(false)
-  ```
+  \`\`\`
 
 #### Modified `performDelete` Function
 - Set `deleting` state to `true` when the delete operation starts
@@ -20,7 +20,7 @@ This document explains the implementation of loading animation during delete ope
 
 #### UI Changes
 - Added a loading overlay that appears when `deleting` is `true`:
-  ```jsx
+  \`\`\`jsx
   {deleting && (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
@@ -29,7 +29,7 @@ This document explains the implementation of loading animation during delete ope
       </div>
     </div>
   )}
-  ```
+  \`\`\`
 - Disabled the "Hapus" (Delete) button during deletion to prevent multiple clicks
 - Added `disabled={deleting}` to both desktop and mobile delete buttons
 
@@ -37,9 +37,9 @@ This document explains the implementation of loading animation during delete ope
 
 #### Added State
 - Added a new state variable `deleting` to track the delete operation status:
-  ```typescript
+  \`\`\`typescript
   const [deleting, setDeleting] = useState(false)
-  ```
+  \`\`\`
 
 #### Modified `performDelete` Function
 - Set `deleting` state to `true` when the delete operation starts
@@ -47,7 +47,7 @@ This document explains the implementation of loading animation during delete ope
 
 #### UI Changes
 - Added a loading overlay that appears when `deleting` is `true`:
-  ```jsx
+  \`\`\`jsx
   {deleting && (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
@@ -56,7 +56,7 @@ This document explains the implementation of loading animation during delete ope
       </div>
     </div>
   )}
-  ```
+  \`\`\`
 - Disabled the "Hapus" (Delete) button during deletion to prevent multiple clicks
 - Added `disabled={deleting}` to both desktop and mobile delete buttons
 

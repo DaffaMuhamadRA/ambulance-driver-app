@@ -68,14 +68,14 @@ This document summarizes the implementation of filter functionality for both adm
 ## API Usage Examples
 
 ### Admin Activities Filter
-```
+\`\`\`
 GET /api/admin/activities?dateFrom=2023-01-01&dateTo=2023-12-31&driverName=John&location=Jakarta
-```
+\`\`\`
 
 ### Driver Activities Filter
-```
+\`\`\`
 GET /api/driver/activities?dateFrom=2023-01-01&dateTo=2023-12-31&location=Jakarta
-```
+\`\`\`
 
 ## Technical Notes
 
