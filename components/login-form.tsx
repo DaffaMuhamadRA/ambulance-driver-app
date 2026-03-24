@@ -94,7 +94,7 @@ export default function LoginForm() {
         />
       </div>
 
-      <div className="flex items-center justify-between">
+      {/* <div className="flex items-center justify-between">
         <div className="text-sm">
           <button
             type="button"
@@ -104,7 +104,7 @@ export default function LoginForm() {
             Lupa password?
           </button>
         </div>
-      </div>
+      </div> */}
 
       <div>
         <Button
