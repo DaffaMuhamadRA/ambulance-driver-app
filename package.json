@@ -104,6 +104,6 @@
     "typescript": "^5"
   },
   "trustedDependencies": [
-    "pg-native"
+   
   ]
 }
