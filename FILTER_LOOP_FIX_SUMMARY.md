@@ -38,7 +38,7 @@ Both dashboard pages had multiple `useEffect` hooks that were calling the same d
 ## Technical Details
 
 ### Before (Problematic Code):
-```typescript
+\`\`\`typescript
 // Admin page - problematic useEffect
 useEffect(() => {
   if (!loading && !user) {
@@ -55,10 +55,10 @@ useEffect(() => {
     fetchAdminActivities() // This was being called in a loop
   }
 }, [user, loading, filters]) // filters in dependency array caused loop
-```
+\`\`\`
 
 ### After (Fixed Code):
-```typescript
+\`\`\`typescript
 // Admin page - fixed useEffect hooks
 useEffect(() => {
   if (!loading && !user) {
@@ -81,10 +81,10 @@ useEffect(() => {
     fetchAdminActivities()
   }
 }, [filters, user]) // Separate hook for filter changes
-```
+\`\`\`
 
 ### ActivityFilter Component Fix:
-```typescript
+\`\`\`typescript
 // Added useRef to track previous values
 const prevFilters = useRef({ dateFrom: "", dateTo: "", driverName: "", location: "" })
 
@@ -102,7 +102,7 @@ useEffect(() => {
     onFilterChange(filters)
   }
 }, [dateFrom, dateTo, driverName, location, isAdmin, onFilterChange])
-```
+\`\`\`
 
 ## Testing
 After implementing these fixes:

@@ -2,9 +2,9 @@
 
 ## Problem
 The application was unable to deploy on Vercel due to the following error:
-```
+\`\`\`
 The following environment variables can not be configured: TZ
-```
+\`\`\`
 
 ## Root Cause
 Vercel does not allow configuring the `TZ` environment variable directly in the [vercel.json](file:///c:/laragon/www/Ambulan-CitaSehat/vercel.json) file or through their dashboard. This is a limitation of Vercel's environment configuration system.
@@ -13,7 +13,7 @@ Vercel does not allow configuring the `TZ` environment variable directly in the 
 
 ### 1. Removed TZ Environment Variable from vercel.json
 The `TZ` environment variable was removed from the [vercel.json](file:///c:/laragon/www/Ambulan-CitaSehat/vercel.json) file:
-```json
+\`\`\`json
 {
   "version": 2,
   "builds": [
@@ -39,21 +39,21 @@ The `TZ` environment variable was removed from the [vercel.json](file:///c:/lara
     // TZ environment variable removed
   }
 }
-```
+\`\`\`
 
 ### 2. Updated .env File
 The `TZ` environment variable was commented out in the [.env](file:///c:/laragon/www/Ambulan-CitaSehat/.env) file with a note about Vercel compatibility:
-```env
+\`\`\`env
 # Konfigurasi zona waktu - Note: TZ environment variable is not supported on Vercel
 # TZ=Asia/Jakarta
-```
+\`\`\`
 
 ### 3. Updated Application Code
 The application code was already designed to handle the absence of the `TZ` environment variable:
-```typescript
+\`\`\`typescript
 // In lib/config.ts
 export const TIMEZONE = process.env.TZ || 'Asia/Jakarta';
-```
+\`\`\`
 
 ### 4. Updated Documentation
 All documentation files were updated to reflect that the application no longer relies on the `TZ` environment variable:

@@ -20,7 +20,7 @@ Masalah ini terjadi karena:
 **File**: `components/confirmation-modal.tsx`
 
 Perubahan:
-```typescript
+\`\`\`typescript
 // Sebelumnya:
 onClick={() => {
   onConfirm();
@@ -33,13 +33,13 @@ onClick={() => {
   // Selalu menutup modal setelah konfirmasi
   onClose();
 }}
-```
+\`\`\`
 
 ### 2. Perbaikan Admin Detail Page
 **File**: `app/admin/activities/[id]/page.tsx`
 
 Perubahan:
-```typescript
+\`\`\`typescript
 // Menambahkan penutupan modal sebelum melakukan penghapusan
 const performDelete = async () => {
   try {
@@ -50,13 +50,13 @@ const performDelete = async () => {
   }
   // ... kode lainnya ...
 }
-```
+\`\`\`
 
 ### 3. Verifikasi User Detail Page
 **File**: `app/activities/[id]/page.tsx`
 
 Konfirmasi bahwa implementasi sudah benar:
-```typescript
+\`\`\`typescript
 const performDelete = async () => {
   try {
     // Close the modal first
@@ -66,7 +66,7 @@ const performDelete = async () => {
   }
   // ... kode lainnya ...
 }
-```
+\`\`\`
 
 ## Hasil Perbaikan
 

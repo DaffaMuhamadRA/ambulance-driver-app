@@ -35,7 +35,7 @@ This mismatch caused the authentication to fail on Vercel (which uses [vercel.js
 ### 1. Updated vercel.json
 Updated database credentials in [vercel.json](file:///c:/laragon/www/Ambulan-CitaSehat/vercel.json) to match those in [.env](file:///c:/laragon/www/Ambulan-CitaSehat/.env):
 
-```json
+\`\`\`json
 {
   "env": {
     "PGHOST": "ep-morning-firefly-a1s6gh0a-pooler.ap-southeast-1.aws.neon.tech",
@@ -46,12 +46,12 @@ Updated database credentials in [vercel.json](file:///c:/laragon/www/Ambulan-Cit
     "PGCHANNELBINDING": "require"
   }
 }
-```
+\`\`\`
 
 ### 2. Enhanced Error Logging
 Updated the login API route to provide more detailed error information for debugging:
 
-```typescript
+\`\`\`typescript
 // Added request logging
 console.log("Request URL:", request.url);
 console.log("Request method:", request.method);
@@ -67,7 +67,7 @@ try {
 
 // Added error details in response
 return NextResponse.json({ error: "Terjadi kesalahan server", details: error.message }, { status: 500 });
-```
+\`\`\`
 
 ## Verification Tests
 

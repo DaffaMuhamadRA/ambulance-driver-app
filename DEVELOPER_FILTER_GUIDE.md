@@ -6,7 +6,7 @@ This guide explains how the filter functionality was implemented in the Ambulan 
 ## Architecture
 
 ### Component Structure
-```
+\`\`\`
 components/
   └── activity-filter.tsx          # Reusable filter UI component
 app/
@@ -21,7 +21,7 @@ app/
       └── driver/
           └── activities/
               └── route.ts         # Driver activities API with filter support
-```
+\`\`\`
 
 ## Frontend Implementation
 
@@ -45,7 +45,7 @@ Both admin and driver dashboard pages were modified to:
 4. Trigger data refresh when filters change
 
 Example integration pattern:
-```typescript
+\`\`\`typescript
 const [filters, setFilters] = useState({});
 
 const handleFilterChange = (newFilters: any) => {
@@ -55,7 +55,7 @@ const handleFilterChange = (newFilters: any) => {
 // In API call:
 const filterParams = new URLSearchParams(filters as any).toString();
 const response = await fetch(`/api/admin/activities${filterParams ? `?${filterParams}` : ''}`);
-```
+\`\`\`
 
 ## Backend Implementation
 
@@ -134,7 +134,7 @@ To add new filter options:
 ### Example: Adding Activity Type Filter
 
 1. **Component Update**
-```typescript
+\`\`\`typescript
 // Add to ActivityFilter component
 const [activityType, setActivityType] = useState("")
 
@@ -150,16 +150,16 @@ if (activityType) filters.activityType = activityType
     <option value="Jenazah">Jenazah</option>
   </select>
 </div>
-```
+\`\`\`
 
 2. **API Update**
-```typescript
+\`\`\`typescript
 // In API route
 const activityType = url.searchParams.get('activityType')
 if (activityType) {
   queryConditions += ` AND da.detail_antar = '${activityType}'`
 }
-```
+\`\`\`
 
 ## Testing
 

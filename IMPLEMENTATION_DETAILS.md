@@ -13,7 +13,7 @@ The activity forms (create and edit) had several issues:
 ### 1. Reward Selection Logic
 Modified the reward selection dropdown to filter options based on user role:
 
-```typescript
+\`\`\`typescript
 // For admin users, show all rewards
 // For driver users, filter by driver status (karyawan/freelance)
 ((user?.role === "admin") || 
@@ -22,7 +22,7 @@ Modified the reward selection dropdown to filter options based on user role:
     {reward.jenis} - {reward.tipe} (Rp {reward.reward?.toLocaleString("id-ID")})
   </option>
 )
-```
+\`\`\`
 
 ### 2. Automatic Reward Determination
 Enhanced the useEffect hook to automatically determine reward based on:
@@ -30,7 +30,7 @@ Enhanced the useEffect hook to automatically determine reward based on:
 - Area (Dalam Kota/Luar Kota)
 - Driver status
 
-```typescript
+\`\`\`typescript
 useEffect(() => {
   // Only auto-select reward if we have all required data
   if (!formData.jam_berangkat || !formData.jam_pulang) return;
@@ -82,7 +82,7 @@ useEffect(() => {
     }));
   }
 }, [formData.jam_berangkat, formData.jam_pulang, formData.area, rewards, user?.role]);
-```
+\`\`\`
 
 ### 3. Field Positioning Changes
 - Moved reward field above the Jenis section
