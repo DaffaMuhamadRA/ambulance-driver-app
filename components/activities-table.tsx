@@ -278,7 +278,7 @@ export default function ActivitiesTable({
             </div>
           </div>
           {/* Apply and Reset buttons for search */}
-          <div className="flex gap-2">
+          {/* <div className="flex gap-2">
             <Button
               onClick={handleApplyFilter}
               className="px-3 py-2 text-sm bg-green-600 text-white hover:bg-green-700"
@@ -292,7 +292,7 @@ export default function ActivitiesTable({
             >
               Reset
             </Button>
-          </div>
+          </div> */}
           {/* Filter Icon - This will be passed from parent */}
           {filterIcon}
           <select
