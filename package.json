@@ -79,7 +79,6 @@
     "next-themes": "latest",
     "node-fetch": "latest",
     "pg": "^8.16.3",
-    "pg-native": "latest",
     "react": "^18",
     "react-day-picker": "9.8.0",
     "react-dom": "^18",
@@ -104,6 +103,6 @@
     "typescript": "^5"
   },
   "trustedDependencies": [
-   
+    "pg-native"
   ]
 }
