@@ -494,9 +494,35 @@ export default function CreateActivityPage() {
     setValidationErrors(errors)
     
     // If there are validation errors, don't submit
-    if (Object.keys(errors).length > 0) {
-      setError("Harap lengkapi semua field yang wajib diisi")
-      return
+    if (Object.keys(errors).length > 0) {// 1. Buat kamus (mapping) nama field agar lebih mudah dibaca oleh pengguna
+      const namaField: Record<string, string> = {
+        tgl_berangkat: "Tanggal Berangkat",
+        tgl_pulang: "Tanggal Pulang",
+        id_ambulan: "Ambulan",
+        id_detail: "Detail Antar",
+        jam_berangkat: "Jam Berangkat",
+        jam_pulang: "Jam Pulang",
+        dari: "Titik Jemput (Dari)",
+        tujuan: "Tujuan",
+        km_awal: "KM Awal",
+        km_akhir: "KM Akhir",
+        id_driver: "Driver",
+        id_kantor: "Kantor"
+      };
+
+      // 2. Kumpulkan nama-nama field yang error menjadi satu kalimat
+      const fieldKosong = Object.keys(errors)
+        .map(key => namaField[key] || key)
+        .join(", ");
+
+      // 3. Tampilkan pesan error yang spesifik di kotak merah atas
+      setError(`Gagal menyimpan! Mohon lengkapi isian berikut: ${fieldKosong}`);
+      
+      // 4. Gulir layar otomatis ke atas agar pengguna langsung menyadari errornya
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      return; // Hentikan proses submit
+    }
     }
     
     try {
@@ -513,11 +539,9 @@ export default function CreateActivityPage() {
         // Convert numeric fields properly
         km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
         km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
-
-        // SOLUSI: Pertegas nilai 0 di sini, ubah string kosong menjadi null/0 dengan eksplisit
-        biaya_antar: formData.biaya_antar !== "" && formData.biaya_antar !== null ? parseInt(formData.biaya_antar.toString()) : 0,
-        biaya_dibayar: formData.biaya_dibayar !== "" && formData.biaya_dibayar !== null ? parseInt(formData.biaya_dibayar.toString()) : 0,
-
+        
+        biaya_antar: formData.biaya_antar ? parseInt(formData.biaya_antar) : 0,
+        biaya_dibayar: formData.biaya_dibayar ? parseInt(formData.biaya_dibayar) : 0,
         infaq: formData.infaq !== "" ? parseInt(formData.infaq) : null,
         id_reward: formData.id_reward ? parseInt(formData.id_reward) : null,
         id_kantor: formData.id_kantor ? parseInt(formData.id_kantor) : null,
