@@ -472,57 +472,32 @@ export default function CreateActivityPage() {
     // Validate required fields
     const errors: Record<string, boolean> = {}
     
-    // Always required fields
-    if (!formData.tgl_berangkat) errors.tgl_berangkat = true // Changed from tgl
-    if (!formData.tgl_pulang) errors.tgl_pulang = true
+    // SESUAI SKEMA DATABASE: Hanya tgl_berangkat dan id_ambulan yang wajib
+    if (!formData.tgl_berangkat) errors.tgl_berangkat = true 
     if (!formData.id_ambulan) errors.id_ambulan = true
-    if (!formData.id_detail) errors.id_detail = true
-    if (!formData.jam_berangkat) errors.jam_berangkat = true
-    if (!formData.jam_pulang) errors.jam_pulang = true
-    if (!formData.dari) errors.dari = true
-    if (!formData.tujuan) errors.tujuan = true
-    if (!formData.km_awal) errors.km_awal = true
-    if (!formData.km_akhir) errors.km_akhir = true
     
-    // Required for admin users
-    if (user?.role === "admin" && !formData.id_driver) errors.id_driver = true
-    
-    // Required for non-admin users
+    // Required for non-admin users (karena id_kantor di skema NOT NULL)
     if (!isDriver && !formData.id_kantor) errors.id_kantor = true
     
     // Update validation errors state
     setValidationErrors(errors)
     
     // If there are validation errors, don't submit
-    if (Object.keys(errors).length > 0) {// 1. Buat kamus (mapping) nama field agar lebih mudah dibaca oleh pengguna
+    if (Object.keys(errors).length > 0) {
       const namaField: Record<string, string> = {
         tgl_berangkat: "Tanggal Berangkat",
-        tgl_pulang: "Tanggal Pulang",
         id_ambulan: "Ambulan",
-        id_detail: "Detail Antar",
-        jam_berangkat: "Jam Berangkat",
-        jam_pulang: "Jam Pulang",
-        dari: "Titik Jemput (Dari)",
-        tujuan: "Tujuan",
-        km_awal: "KM Awal",
-        km_akhir: "KM Akhir",
-        id_driver: "Driver",
         id_kantor: "Kantor"
       };
 
-      // 2. Kumpulkan nama-nama field yang error menjadi satu kalimat
       const fieldKosong = Object.keys(errors)
         .map(key => namaField[key] || key)
         .join(", ");
 
-      // 3. Tampilkan pesan error yang spesifik di kotak merah atas
       setError(`Gagal menyimpan! Mohon lengkapi isian berikut: ${fieldKosong}`);
-      
-      // 4. Gulir layar otomatis ke atas agar pengguna langsung menyadari errornya
       window.scrollTo({ top: 0, behavior: 'smooth' });
       
-      return; // Hentikan proses submit
-    }
+      return; 
     }
     
     try {
@@ -536,19 +511,27 @@ export default function CreateActivityPage() {
       const dataToSend = {
         ...formData,
         id_driver: driverId ? Number.parseInt(driverId) : null,
-        // Convert numeric fields properly
-        km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
-        km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
         
-        biaya_antar: formData.biaya_antar ? parseInt(formData.biaya_antar) : 0,
-        biaya_dibayar: formData.biaya_dibayar ? parseInt(formData.biaya_dibayar) : 0,
+        // Ubah fallback dari 0 menjadi null jika kosong
+        km_awal: formData.km_awal !== "" ? parseInt(formData.km_awal) : null,
+        km_akhir: formData.km_akhir !== "" ? parseInt(formData.km_akhir) : null,
+        biaya_antar: formData.biaya_antar !== "" ? parseInt(formData.biaya_antar) : null,
+        biaya_dibayar: formData.biaya_dibayar !== "" ? parseInt(formData.biaya_dibayar) : null,
+        
         infaq: formData.infaq !== "" ? parseInt(formData.infaq) : null,
         id_reward: formData.id_reward ? parseInt(formData.id_reward) : null,
         id_kantor: formData.id_kantor ? parseInt(formData.id_kantor) : null,
         id_ambulan: formData.id_ambulan ? parseInt(formData.id_ambulan) : null,
         id_detail: formData.id_detail ? parseInt(formData.id_detail) : null,
         id_pemesan: formData.id_pemesan ? parseInt(formData.id_pemesan) : null,
-        id_penerima_manfaat: formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null
+        id_penerima_manfaat: formData.id_penerima_manfaat ? parseInt(formData.id_penerima_manfaat) : null,
+        
+        // Pastikan field waktu/tanggal yang kosong dikirim sebagai null
+        tgl_pulang: formData.tgl_pulang || null,
+        jam_berangkat: formData.jam_berangkat || null,
+        jam_pulang: formData.jam_pulang || null,
+        dari: formData.dari || null,
+        tujuan: formData.tujuan || null
       }
 
       // Log the asisten_luar_kota value specifically
@@ -730,12 +713,8 @@ export default function CreateActivityPage() {
                 name="tgl_pulang"
                 value={formData.tgl_pulang}
                 onChange={handleInputChange}
-                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tgl_pulang ? 'border-red-500' : 'border-gray-300'}`}
-                required
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
-              {validationErrors.tgl_pulang && (
-                <p className="mt-1 text-sm text-red-600">Tanggal pulang wajib diisi</p>
-              )}
             </div>
 
             {/* Ambulan */}
@@ -806,12 +785,8 @@ export default function CreateActivityPage() {
                 name="jam_pulang"
                 value={formData.jam_pulang}
                 onChange={handleInputChange}
-                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.jam_pulang ? 'border-red-500' : 'border-gray-300'}`}
-                required
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
-              {validationErrors.jam_pulang && (
-                <p className="mt-1 text-sm text-red-600">Jam pulang wajib diisi</p>
-              )}
             </div>
 
             {/* Driver (only for admin) */}
@@ -873,12 +848,8 @@ export default function CreateActivityPage() {
                 name="dari"
                 value={formData.dari}
                 onChange={handleInputChange}
-                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.dari ? 'border-red-500' : 'border-gray-300'}`}
-                required
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
-              {validationErrors.dari && (
-                <p className="mt-1 text-sm text-red-600">Dari wajib diisi</p>
-              )}
             </div>
 
             {/* Tujuan */}
@@ -889,12 +860,8 @@ export default function CreateActivityPage() {
                 name="tujuan"
                 value={formData.tujuan}
                 onChange={handleInputChange}
-                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.tujuan ? 'border-red-500' : 'border-gray-300'}`}
-                required
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
-              {validationErrors.tujuan && (
-                <p className="mt-1 text-sm text-red-600">Tujuan wajib diisi</p>
-              )}
             </div>
 
             {/* KM Awal */}
@@ -905,12 +872,8 @@ export default function CreateActivityPage() {
                 name="km_awal"
                 value={formData.km_awal}
                 onChange={handleInputChange}
-                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.km_awal ? 'border-red-500' : 'border-gray-300'}`}
-                required
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
-              {validationErrors.km_awal && (
-                <p className="mt-1 text-sm text-red-600">KM awal wajib diisi</p>
-              )}
             </div>
 
             {/* KM Akhir */}
@@ -921,12 +884,8 @@ export default function CreateActivityPage() {
                 name="km_akhir"
                 value={formData.km_akhir}
                 onChange={handleInputChange}
-                className={`block w-full px-3 py-2 mt-1 text-base border rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${validationErrors.km_akhir ? 'border-red-500' : 'border-gray-300'}`}
-                required
+                className="block w-full px-3 py-2 mt-1 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
-              {validationErrors.km_akhir && (
-                <p className="mt-1 text-sm text-red-600">KM akhir wajib diisi</p>
-              )}
             </div>
 
             {/* Biaya Antar - Editable for all users */}
