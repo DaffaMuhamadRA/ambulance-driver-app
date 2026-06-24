@@ -95,8 +95,7 @@ export async function POST(request: Request) {
     const sanitizedBiayaAntar = biaya_antar !== null && biaya_antar !== undefined ? validateNumericInput(biaya_antar, 0) : null;
     
     if (!sanitizedTgl || !sanitizedIdAmbulan || !sanitizedIdDetail || !sanitizedJamBerangkat || 
-        !sanitizedArea || !sanitizedDari || !sanitizedTujuan || !sanitizedKmAwal || !sanitizedKmAkhir || 
-        !sanitizedBiayaAntar) {
+        !sanitizedArea || !sanitizedDari ) {
       return NextResponse.json(
         { error: "Invalid or missing required fields" },
         { status: 400 }
@@ -119,7 +118,7 @@ export async function POST(request: Request) {
     const sanitizedIdDriver = validateNumericInput(id_driver)
     const sanitizedAsistenLuarKota = asisten_luar_kota ? validateStringInput(asisten_luar_kota, 100) : null
     const sanitizedKmAkhirNum = sanitizedKmAkhir
-    const sanitizedSelisihKm = sanitizedKmAkhirNum - sanitizedKmAwal
+    const sanitizedSelisihKm = (sanitizedKmAkhir ?? 0) - (sanitizedKmAwal ?? 0);
     
     const sanitizedBiayaDibayar = biaya_dibayar ? validateNumericInput(biaya_dibayar, 0) : null
     const sanitizedIdPemesan = id_pemesan ? validateNumericInput(id_pemesan) : null
