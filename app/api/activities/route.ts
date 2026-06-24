@@ -63,22 +63,36 @@ export async function POST(request: Request) {
     } = body
     
     // Validate and sanitize required fields
-    const sanitizedTgl = validateDateInput(tgl_berangkat) // Changed from tgl to tgl_berangkat
-    const sanitizedIdAmbulan = validateNumericInput(id_ambulan)
-    const sanitizedIdDetail = validateNumericInput(id_detail)
-    // Handle time values that might include seconds (HH:MM:SS format)
-    let jamBerangkatValue = jam_berangkat;
-    if (jamBerangkatValue && jamBerangkatValue.length === 8 && jamBerangkatValue.split(':').length === 3) {
-      // If time is in HH:MM:SS format, extract only HH:MM
-      jamBerangkatValue = jamBerangkatValue.substring(0, 5);
+    // 1. Validate strictly required fields (based on Neon DB schema constraints)
+    const sanitizedTgl = validateDateInput(tgl_berangkat);
+    const sanitizedIdAmbulan = validateNumericInput(id_ambulan);
+    const sanitizedIdKantor = id_kantor ? validateNumericInput(id_kantor) : null;
+    
+    if (!sanitizedTgl || !sanitizedIdAmbulan || !sanitizedIdKantor) {
+      return NextResponse.json(
+        { error: "Invalid or missing strictly required fields (tgl, id_ambulan, or id_kantor)" },
+        { status: 400 }
+      );
     }
-    const sanitizedJamBerangkat = validateTimeInput(jamBerangkatValue)
-    const sanitizedArea = validateStringInput(area)
-    const sanitizedDari = validateStringInput(dari, 100)
-    const sanitizedTujuan = validateStringInput(tujuan, 100)
-    const sanitizedKmAwal = validateNumericInput(km_awal, 0)
-    const sanitizedKmAkhir = validateNumericInput(km_akhir, 0)
-    const sanitizedBiayaAntar = validateNumericInput(biaya_antar, 0)
+
+    // 2. Validate and sanitize optional fields
+    const sanitizedIdDetail = id_detail ? validateNumericInput(id_detail) : null;
+    
+    let sanitizedJamBerangkat = null;
+    if (jam_berangkat) {
+      let jamBerangkatValue = jam_berangkat;
+      if (jamBerangkatValue.length === 8 && jamBerangkatValue.split(':').length === 3) {
+        jamBerangkatValue = jamBerangkatValue.substring(0, 5);
+      }
+      sanitizedJamBerangkat = validateTimeInput(jamBerangkatValue);
+    }
+
+    const sanitizedArea = area ? validateStringInput(area) : null;
+    const sanitizedDari = dari ? validateStringInput(dari, 100) : null;
+    const sanitizedTujuan = tujuan ? validateStringInput(tujuan, 100) : null;
+    const sanitizedKmAwal = km_awal !== null && km_awal !== undefined ? validateNumericInput(km_awal, 0) : null;
+    const sanitizedKmAkhir = km_akhir !== null && km_akhir !== undefined ? validateNumericInput(km_akhir, 0) : null;
+    const sanitizedBiayaAntar = biaya_antar !== null && biaya_antar !== undefined ? validateNumericInput(biaya_antar, 0) : null;
     
     if (!sanitizedTgl || !sanitizedIdAmbulan || !sanitizedIdDetail || !sanitizedJamBerangkat || 
         !sanitizedArea || !sanitizedDari || !sanitizedTujuan || !sanitizedKmAwal || !sanitizedKmAkhir || 
@@ -101,11 +115,12 @@ export async function POST(request: Request) {
       }
       sanitizedJamPulang = validateTimeInput(jamPulangValue)
     }
-    const sanitizedIdKantor = id_kantor ? validateNumericInput(id_kantor) : null
+
     const sanitizedIdDriver = validateNumericInput(id_driver)
     const sanitizedAsistenLuarKota = asisten_luar_kota ? validateStringInput(asisten_luar_kota, 100) : null
     const sanitizedKmAkhirNum = sanitizedKmAkhir
     const sanitizedSelisihKm = sanitizedKmAkhirNum - sanitizedKmAwal
+    
     const sanitizedBiayaDibayar = biaya_dibayar ? validateNumericInput(biaya_dibayar, 0) : null
     const sanitizedIdPemesan = id_pemesan ? validateNumericInput(id_pemesan) : null
     const sanitizedIdPenerimaManfaat = id_penerima_manfaat ? validateNumericInput(id_penerima_manfaat) : null
