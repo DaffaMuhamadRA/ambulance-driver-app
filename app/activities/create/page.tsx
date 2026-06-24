@@ -513,8 +513,11 @@ export default function CreateActivityPage() {
         // Convert numeric fields properly
         km_awal: formData.km_awal ? parseInt(formData.km_awal) : 0,
         km_akhir: formData.km_akhir ? parseInt(formData.km_akhir) : 0,
-        biaya_antar: formData.biaya_antar ? parseInt(formData.biaya_antar) : 0,
-        biaya_dibayar: formData.biaya_dibayar ? parseInt(formData.biaya_dibayar) : 0,
+
+        // SOLUSI: Pertegas nilai 0 di sini, ubah string kosong menjadi null/0 dengan eksplisit
+        biaya_antar: formData.biaya_antar !== "" && formData.biaya_antar !== null ? parseInt(formData.biaya_antar.toString()) : 0,
+        biaya_dibayar: formData.biaya_dibayar !== "" && formData.biaya_dibayar !== null ? parseInt(formData.biaya_dibayar.toString()) : 0,
+
         infaq: formData.infaq !== "" ? parseInt(formData.infaq) : null,
         id_reward: formData.id_reward ? parseInt(formData.id_reward) : null,
         id_kantor: formData.id_kantor ? parseInt(formData.id_kantor) : null,
